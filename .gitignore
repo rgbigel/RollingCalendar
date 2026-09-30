@@ -1,0 +1,11 @@
+# Generated PDF output
+output/
+
+# Temporary headless render file
+temp_calendar.html
+
+# PowerShell history
+*.pshistory
+
+# VS Code workspace settings
+.vscode/

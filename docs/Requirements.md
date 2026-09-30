@@ -4,7 +4,7 @@ Module: RollingCalendar/docs/Requirements.md
 Purpose: Normative technical constraints, environmental prerequisites, and safety invariants for the RollingCalendar tool.
 Path: RollingCalendar/docs/Requirements.md
 Authors: rgbig, Workspace_AI Governance
-Version: 1.0.0
+Version: 1.1.1
 Status: Authoritative Standard
 Date: 2026-09-30
 
@@ -31,7 +31,7 @@ Date: 2026-09-30
 - **MUST** unfold RFC 5545 folded lines before parsing VEVENT blocks.
 - **MUST** HTML-encode all event summaries before injection into the HTML template (`[System.Web.HttpUtility]::HtmlEncode`).
 - **MUST** write the temporary HTML file as UTF-8 (`Set-Content -Encoding utf8`) before dispatching Edge Headless.
-- **MUST** exclude `output\` and `temp_calendar.html` from version control via `.gitignore`.
+- **MUST** write generated PDFs and temporary HTML to `C:\Temp` by default, outside the repository working tree.
 
 ---
 
@@ -55,7 +55,7 @@ Date: 2026-09-30
 |:---|:---|
 | ICS URL not reachable | `Write-Warning`; operator prompted to re-enter URL |
 | Invalid time format | Interactive re-prompt loop until valid or `0` supplied |
-| Edge not found at primary path | Falls back to secondary path; if both missing, `Start-Process` throws |
+| Edge not found at primary path | Falls back to secondary path; if both missing, rendering fails with a terminating error |
 | ICS fetch fails at runtime | `catch` block re-prompts for URL, then retries once |
 
 ---

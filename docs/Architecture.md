@@ -4,7 +4,7 @@ Module: RollingCalendar/docs/Architecture.md
 Purpose: Operator mental model, CLI entry points, data-flow topology, and external boundaries for the RollingCalendar tool.
 Path: RollingCalendar/docs/Architecture.md
 Authors: rgbig, Workspace_AI Governance
-Version: 1.0.0
+Version: 1.1.1
 Status: Authoritative Standard
 Date: 2026-09-30
 
@@ -25,7 +25,7 @@ Invoke-RollingCalendar.ps1
    ├─► RFC 5545 ICS Parser     (in-memory, no external module)
    ├─► HTML Matrix Generator   (inline here-string template)
    ├─► Microsoft Edge Headless (--print-to-pdf)
-   └─► output\Calendar_NW_YYYY-MM-DD.pdf
+   └─► C:\Temp\Calendar_NW_YYYY-MM-DD.pdf
 ```
 
 ---
@@ -37,7 +37,7 @@ Invoke-RollingCalendar.ps1
 | `.\Invoke-RollingCalendar.ps1` | Immediate 4-week PDF export |
 | `.\Invoke-RollingCalendar.ps1 -Frequency 2w` | 2-week grid |
 | `.\Invoke-RollingCalendar.ps1 -Time 06:00` | Register weekly Task Scheduler job + immediate export |
-| `.\Invoke-RollingCalendar.ps1 -OpenAfterExport` | Export then open PDF in default viewer |
+| `.\Invoke-RollingCalendar.ps1 -NoShow` | Export without opening the PDF viewer |
 | `.\Invoke-RollingCalendar.ps1 -SendToPrinter` | Export then print to Windows default printer |
 | `.\Invoke-RollingCalendar.ps1 -ResetUrl` | Force re-entry of ICS URL and persist to registry |
 
@@ -81,7 +81,8 @@ RollingCalendar\
 │   └── Implementation.md
 ├── install\
 │   └── Installation.md
-└── output\          (git-ignored)
-    ├── Calendar_4W_YYYY-MM-DD.pdf
-    └── temp_calendar.html
+```
+
+Generated PDFs and temporary HTML are written to `C:\Temp` by default, outside
+the repository working tree.
 ```

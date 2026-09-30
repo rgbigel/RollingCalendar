@@ -16,8 +16,11 @@ Renders a rolling Outlook calendar view (1–4 weeks from the current Monday) as
 # Immediate 4-week PDF export
 .\Invoke-RollingCalendar.ps1
 
-# 2-week export, open after rendering
-.\Invoke-RollingCalendar.ps1 -Frequency 2w -OpenAfterExport
+# 2-week export to C:\Temp (opens the completed PDF by default)
+.\Invoke-RollingCalendar.ps1 -Frequency 2w
+
+# Suppress opening the completed PDF
+.\Invoke-RollingCalendar.ps1 -Frequency 2w -NoShow
 
 # Schedule weekly export every Monday at 06:00 (requires elevation)
 .\Invoke-RollingCalendar.ps1 -Time 06:00 -Frequency 1w

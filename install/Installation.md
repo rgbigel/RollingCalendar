@@ -4,7 +4,7 @@ Module: RollingCalendar/install/Installation.md
 Purpose: 7-phase installation and servicing runbook for the RollingCalendar tool.
 Path: RollingCalendar/install/Installation.md
 Authors: rgbig, Workspace_AI Governance
-Version: 1.0.0
+Version: 1.1.1
 Status: Authoritative Standard
 Date: 2026-09-30
 
@@ -32,10 +32,10 @@ D:\Git_Repositories\RollingCalendar\     <- repository root
 ├── README.md
 ├── docs\                                <- tripartite specifications
 ├── install\                             <- this runbook
-└── output\                              <- generated PDFs (git-ignored)
 ```
 
 The operator invokes the script directly from the repository root or via a shortcut / scheduled task.
+Generated PDFs and temporary HTML are written to `C:\Temp` by default.
 
 ---
 
@@ -94,10 +94,12 @@ The URL is verified (HTTP 200 + `BEGIN:VCALENDAR`) and saved to `HKCU:\Environme
 
 ```powershell
 # Requires administrator — script self-elevates automatically
-.\Invoke-RollingCalendar.ps1 -Time 06:00 -Frequency 4w
+.\Invoke-RollingCalendar.ps1 -Time 06:00 -Frequency 4w -NoShow
 ```
 
 The task runs every Monday at 06:00, starting from the next non-past Monday.
+The script accepts `HH:mm`, `HHmm`, `yyyyMMdd_HHmm`, and
+`yyyyMMdd_HHmmss` for `-Time`; timestamps are normalized to their time of day.
 
 ---
 
@@ -108,7 +110,7 @@ The task runs every Monday at 06:00, starting from the next non-past Monday.
 (Get-ItemProperty -Path HKCU:\Environment -Name OUTLOOK_ROLLING_CALENDAR_ICS_URL).OUTLOOK_ROLLING_CALENDAR_ICS_URL
 
 # Confirm PDF was generated
-Get-ChildItem D:\Git_Repositories\RollingCalendar\output\*.pdf | Select-Object Name, LastWriteTime
+Get-ChildItem C:\Temp\Calendar_*.pdf | Select-Object Name, LastWriteTime
 ```
 
 ---
@@ -116,7 +118,7 @@ Get-ChildItem D:\Git_Repositories\RollingCalendar\output\*.pdf | Select-Object N
 ## Phase 6 — Ongoing Servicing & Update Runbook
 
 1. Pull latest changes: `git -C D:\Git_Repositories\RollingCalendar pull`
-2. Re-run the script to verify output: `.\Invoke-RollingCalendar.ps1 -OpenAfterExport`
+2. Re-run the script to verify output: `.\Invoke-RollingCalendar.ps1`
 3. If the Outlook ICS URL changes: `.\Invoke-RollingCalendar.ps1 -ResetUrl`
 4. To update the Task Scheduler job (new time or frequency):
    ```powershell

@@ -4,7 +4,7 @@ Module: RollingCalendar/docs/Implementation.md
 Purpose: Code blueprint, script inventory, parameter signatures, and constituent manifest for the RollingCalendar tool.
 Path: RollingCalendar/docs/Implementation.md
 Authors: rgbig, Workspace_AI Governance
-Version: 1.0.0
+Version: 1.1.1
 Status: Authoritative Standard
 Date: 2026-09-30
 
@@ -14,13 +14,13 @@ Date: 2026-09-30
 
 | Relative Path | Role / Layer | Primary Entrypoints | Pester Test Suite |
 |:---|:---|:---|:---|
-| `Invoke-RollingCalendar.ps1` | Main script / orchestrator | Script root | — |
+| `Invoke-RollingCalendar.ps1` | Main script / orchestrator | Script root | `tests/Invoke-RollingCalendar.Tests.ps1` |
+| `tests/Invoke-RollingCalendar.Tests.ps1` | Static quality contract | Pester | — |
 | `docs/Architecture.md` | Tripartite — Architecture | — | — |
 | `docs/Requirements.md` | Tripartite — Requirements | — | — |
 | `docs/Implementation.md` | Tripartite — Implementation | — | — |
 | `install/Installation.md` | Install runbook | — | — |
 | `.gitignore` | VCS exclusion | — | — |
-| `output/` | PDF output directory (git-ignored) | — | — |
 
 ---
 
@@ -28,10 +28,10 @@ Date: 2026-09-30
 
 | Parameter | Type | Default | Description |
 |:---|:---|:---|:---|
-| `-Time` | `string` | `'0'` | Scheduler time (HH:mm / HHmm). `'0'` = immediate export only. |
+| `-Time` | `string` | `'0'` | Scheduler time (`HH:mm`, `HHmm`, `yyyyMMdd_HHmm`, or `yyyyMMdd_HHmmss`). `'0'` = immediate export only. |
 | `-Frequency` | `ValidateSet` | `'4w'` | Grid span: `1w`, `2w`, `3w`, `4w`. Also controls scheduler interval. |
-| `-OutputDir` | `string` | `"$PSScriptRoot\output"` | Target directory for generated PDF and temp HTML. |
-| `-OpenAfterExport` | `switch` | off | Opens generated PDF in default viewer after rendering. |
+| `-OutputDir` / `-o` | `string` | `C:\Temp` | Target directory for generated PDF and temp HTML. |
+| `-NoShow` | `switch` | off | Suppresses the default behavior of opening the generated PDF after rendering. |
 | `-SendToPrinter` | `switch` | off | Sends PDF to Windows default printer after rendering. |
 | `-ResetUrl` | `switch` | off | Forces re-prompt and re-persistence of the ICS URL. |
 
@@ -46,7 +46,8 @@ Date: 2026-09-30
 | `Test-IcsUrl` | `Test-` ✓ | HTTP GET probe confirming URL returns HTTP 200 and `BEGIN:VCALENDAR`. |
 | `Get-OrPromptIcsUrl` | `Get-` ✓ | Reads ICS URL from `HKCU:\Environment`; prompts and persists if absent or `-ResetUrl`. |
 | `Register-CalendarTask` | `Register-` ✓ | Creates a weekly Task Scheduler job starting on the next non-past Monday. |
-| `Add-SpanEvent` | `Add-` ✓ | Inserts an event entry into `$events` hashtable for each day it spans within the window. |
+| `Add-SpanEvent` | `Add-` ✓ | Inserts an event entry into its explicit event collection for each day it spans within the supplied window. |
+| `Invoke-EdgePdfExport` | `Invoke-` ✓ | Renders the PDF with captured Edge diagnostics and verifies the result. |
 
 ---
 
@@ -67,16 +68,10 @@ Keyed by ISO date string. Populated by `Add-SpanEvent` during ICS parse.
 
 ### Edge Headless Invocation
 
-```powershell
-Start-Process -FilePath $edgePath -ArgumentList @(
-  '--headless',
-  '--disable-gpu',
-  '--run-all-compositor-stages-before-draw',
-  '--no-pdf-header-footer',
-  "--print-to-pdf=`"$outputPdf`"",
-  "`"$fileUri`""
-) -Wait -NoNewWindow
-```
+`Invoke-EdgePdfExport` launches Edge with redirected standard output and error.
+It suppresses only the known non-fatal renderer fallback diagnostic after a
+nonempty PDF is created; other diagnostics are shown as warnings, while an Edge
+failure or missing PDF terminates the run.
 
 ---
 
@@ -96,4 +91,5 @@ Start-Process -FilePath $edgePath -ArgumentList @(
 | Artifact | Pattern |
 |:---|:---|
 | PDF | `Calendar_<N>W_<YYYY-MM-DD>.pdf` |
-| Temp HTML | `temp_calendar.html` (overwritten each run, git-ignored) |
+| Temp HTML | `temp_calendar.html` (overwritten each run) |
+| Default directory | `C:\Temp` |

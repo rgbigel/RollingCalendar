@@ -1,44 +1,3 @@
-<#
-.SYNOPSIS
-    Renders a rolling calendar view (1 to 4 weeks from the current Monday)
-    as a DIN A4 landscape PDF via Headless Edge.
-
-.DESCRIPTION
-    - Manages the Outlook ICS URL persistently in HKCU:\Environment.
-    - Performs automatic self-elevation for administrator privileges when needed.
-    - Optionally configures the Windows Task Scheduler without retroactive scheduling.
-    - Supports multi-day events (including those that started before the calendar window).
-    - Supports RRULE recurrence rules (DAILY, WEEKLY, MONTHLY, INTERVAL, BYDAY, UNTIL/COUNT).
-    - Dynamically adjusts the grid to the selected frequency (-Frequency 1w - 4w).
-
-.PARAMETER Time
-    Start time in HH:mm or HHmm format (e.g. "06:00", "0600").
-    If the value is "0" (default), only an immediate export is performed without task scheduling.
-
-.PARAMETER Frequency
-    Calendar scope and scheduler interval: 1w, 2w, 3w, 4w (Default: 4w).
-
-.PARAMETER OutputDir
-    Target directory for the generated PDF (Default: .\output).
-
-.PARAMETER OpenAfterExport
-    Opens the generated PDF directly in the default PDF viewer.
-
-.PARAMETER SendToPrinter
-    Sends the finished PDF directly to the Windows default printer.
-
-.PARAMETER ResetUrl
-    Forces re-registration of the stored ICS URL in the registry.
-#>
-
-# Module: RollingCalendar/Invoke-RollingCalendar.ps1
-# Purpose: Renders a rolling calendar view (1 to 4 weeks) as a DIN A4 landscape PDF via Headless Edge.
-# Path: RollingCalendar/Invoke-RollingCalendar.ps1
-# Authors: rgbig
-# Version: 1.0.0
-# Status: Production
-# Date: 2026-09-30
-
 [CmdletBinding()]
 param (
   [Parameter()]
@@ -50,20 +9,42 @@ param (
   [string]$Frequency = '4w',
 
   [Parameter()]
-  [string]$OutputDir = "$PSScriptRoot\output",
+  [Alias('o')]
+  [string]$OutputDir = 'C:\Temp',
 
   [Parameter()]
-  [switch]$OpenAfterExport,
+  [switch]$NoShow,
 
   [Parameter()]
   [switch]$SendToPrinter,
 
   [Parameter()]
-  [switch]$ResetUrl
+  [switch]$ResetUrl,
+
+  [Alias('h', '?')]
+  [switch]$Help
 )
+
+<#
+.SYNOPSIS
+    Renders a rolling calendar view (1 to 4 weeks from the current Monday)
+    as a DIN A4 landscape PDF via Headless Edge.
+.DESCRIPTION
+    Module: RollingCalendar/Invoke-RollingCalendar.ps1
+    Purpose: Renders a rolling Outlook ICS calendar as a landscape PDF.
+    Path: RollingCalendar/Invoke-RollingCalendar.ps1
+    Authors: rgbig
+    Version: 1.1.0
+    Date: 2026-09-30
+#>
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+if ($Help) {
+  Write-Host 'Usage: pwsh -File Invoke-RollingCalendar.ps1 [-Time HH:mm|HHmm|yyyyMMdd_HHmm|yyyyMMdd_HHmmss] [-Frequency 1w|2w|3w|4w] [-OutputDir <directory>] [-NoShow] [-SendToPrinter] [-ResetUrl] [-Help]'
+  return
+}
 
 $RegKeyPath = 'HKCU:\Environment'
 $EnvVarName = 'OUTLOOK_ROLLING_CALENDAR_ICS_URL'
@@ -72,18 +53,40 @@ $EnvVarName = 'OUTLOOK_ROLLING_CALENDAR_ICS_URL'
 # 1. SELF-ELEVATION (required when configuring Task Scheduler)
 # ==============================================================================
 function Test-IsAdmin {
+  [CmdletBinding()]
+  param()
+
+  <#
+  .SYNOPSIS
+      Tests whether the current process is elevated.
+  #>
   $identity  = [Security.Principal.WindowsIdentity]::GetCurrent()
   $principal = [Security.Principal.WindowsPrincipal]$identity
   return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
 function Resolve-ValidTime {
-  param ([string]$RawTime)
+  [CmdletBinding()]
+  param(
+    [string]$RawTime
+  )
+
+  <#
+  .SYNOPSIS
+      Validates an interactive calendar export time.
+  .PARAMETER RawTime
+      The time value to validate.
+  #>
 
   while ($true) {
     if ($RawTime -eq '0') { return $null }
 
-    $normalized = $RawTime -replace '[^\d:]', ''
+    if ($RawTime -match '^\d{8}_(\d{2})(\d{2})(?:\d{2})?$') {
+      $normalized = "$($Matches[1]):$($Matches[2])"
+    }
+    else {
+      $normalized = $RawTime -replace '[^\d:]', ''
+    }
     if ($normalized -match '^(\d{1,2}):(\d{2})$' -or $normalized -match '^(\d{1,2})(\d{2})$') {
       $h = [int]$Matches[1]
       $m = [int]$Matches[2]
@@ -92,7 +95,7 @@ function Resolve-ValidTime {
       }
     }
 
-    Write-Host ("Time value '$RawTime' is invalid (format: HH:mm or HHmm, e.g. 06:00 or 0600).") -ForegroundColor Red
+    Write-Host ("Time value '$RawTime' is invalid (use HH:mm, HHmm, yyyyMMdd_HHmm, or yyyyMMdd_HHmmss).") -ForegroundColor Red
     $RawTime = Read-Host "Please enter a valid time (or '0' to skip task scheduling)"
   }
 }
@@ -102,7 +105,8 @@ $parsedTime = Resolve-ValidTime -RawTime $Time
 if ($parsedTime -and (-not (Test-IsAdmin))) {
   Write-Host 'Task scheduling requires administrator privileges. Starting elevation...' -ForegroundColor Yellow
   $allArgs = @('-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"", '-Time', "`"$parsedTime`"", '-Frequency', "`"$Frequency`"")
-  if ($OpenAfterExport) { $allArgs += '-OpenAfterExport' }
+  $allArgs += @('-OutputDir', "`"$OutputDir`"")
+  if ($NoShow)          { $allArgs += '-NoShow' }
   if ($SendToPrinter)   { $allArgs += '-SendToPrinter' }
   if ($ResetUrl)        { $allArgs += '-ResetUrl' }
 
@@ -115,7 +119,17 @@ if ($parsedTime -and (-not (Test-IsAdmin))) {
 # 2. REGISTRY PERSISTENCE FOR ICS URL (HKCU:\Environment)
 # ==============================================================================
 function Test-IcsUrl {
-  param ([string]$Url)
+  [CmdletBinding()]
+  param(
+    [string]$Url
+  )
+
+  <#
+  .SYNOPSIS
+      Tests whether an ICS URL returns calendar content.
+  .PARAMETER Url
+      The ICS URL to request.
+  #>
   if ([string]::IsNullOrWhiteSpace($Url) -or -not ($Url -match '^https?://')) {
     return $false
   }
@@ -130,26 +144,46 @@ function Test-IcsUrl {
 }
 
 function Get-OrPromptIcsUrl {
-  param ([switch]$ForcePrompt)
+  [CmdletBinding()]
+  param(
+    [switch]$ForcePrompt,
+    [string]$RegistryKeyPath,
+    [string]$EnvironmentVariableName
+  )
+
+  <#
+  .SYNOPSIS
+      Retrieves a stored ICS URL or prompts for a validated replacement.
+  .PARAMETER ForcePrompt
+      Forces the interactive URL prompt.
+  .PARAMETER RegistryKeyPath
+      The registry key that stores the URL.
+  .PARAMETER EnvironmentVariableName
+      The environment-variable name used for the URL.
+  #>
 
   $currentVal = $null
-  if (Test-Path $RegKeyPath) {
-    $currentVal = (Get-ItemProperty -Path $RegKeyPath -Name $EnvVarName -ErrorAction SilentlyContinue).$EnvVarName
+  if (Test-Path $RegistryKeyPath) {
+    $registryValues = Get-ItemProperty -Path $RegistryKeyPath -Name $EnvironmentVariableName -ErrorAction SilentlyContinue
+    $urlProperty = if ($registryValues) { $registryValues.PSObject.Properties[$EnvironmentVariableName] } else { $null }
+    if ($urlProperty) {
+      $currentVal = [string]$urlProperty.Value
+    }
   }
 
   if ($ForcePrompt -or [string]::IsNullOrWhiteSpace($currentVal)) {
     if (-not $ForcePrompt) {
-      Write-Warning "No stored ICS URL found at '$RegKeyPath\$EnvVarName'."
+      Write-Warning "No stored ICS URL found at '$RegistryKeyPath\$EnvironmentVariableName'."
     }
 
     while ($true) {
       $inputUrl = (Read-Host 'Please enter the Outlook ICS publishing URL').Trim()
       if (Test-IcsUrl -Url $inputUrl) {
-        if (-not (Test-Path $RegKeyPath)) {
-          New-Item -Path $RegKeyPath -Force | Out-Null
+        if (-not (Test-Path $RegistryKeyPath)) {
+          New-Item -Path $RegistryKeyPath -Force | Out-Null
         }
-        Set-ItemProperty -Path $RegKeyPath -Name $EnvVarName -Value $inputUrl -Type String
-        [Environment]::SetEnvironmentVariable($EnvVarName, $inputUrl, [EnvironmentVariableTarget]::Process)
+        Set-ItemProperty -Path $RegistryKeyPath -Name $EnvironmentVariableName -Value $inputUrl -Type String
+        [Environment]::SetEnvironmentVariable($EnvironmentVariableName, $inputUrl, [EnvironmentVariableTarget]::Process)
         Write-Host 'URL successfully verified and saved to HKCU:\Environment.' -ForegroundColor Green
         return $inputUrl
       }
@@ -159,7 +193,7 @@ function Get-OrPromptIcsUrl {
     }
   }
   else {
-    [Environment]::SetEnvironmentVariable($EnvVarName, $currentVal, [EnvironmentVariableTarget]::Process)
+    [Environment]::SetEnvironmentVariable($EnvironmentVariableName, $currentVal, [EnvironmentVariableTarget]::Process)
     return $currentVal
   }
 }
@@ -168,11 +202,32 @@ function Get-OrPromptIcsUrl {
 # 3. TASK SCHEDULER SETUP (non-retroactive)
 # ==============================================================================
 function Register-CalendarTask {
-  param (
+  [CmdletBinding()]
+  param(
     [string]$ValidTime,
     [string]$Frequ,
-    [string]$ScriptPath
+    [string]$ScriptPath,
+    [string]$OutputDir,
+    [switch]$NoShow,
+    [switch]$PrintOnCompletion
   )
+
+  <#
+  .SYNOPSIS
+      Registers the recurring calendar export task.
+  .PARAMETER ValidTime
+      The validated task start time.
+  .PARAMETER Frequ
+      The recurrence interval in weeks.
+  .PARAMETER ScriptPath
+      The script invoked by the scheduled task.
+    .PARAMETER OutputDir
+      The directory for generated calendar files.
+    .PARAMETER NoShow
+      Suppresses opening the generated PDF after export.
+  .PARAMETER PrintOnCompletion
+      Adds the print option to the scheduled invocation.
+  #>
 
   $weeksInterval = [int]($Frequ -replace 'w', '')
   $taskName      = 'Outlook-RollingCalendar-Export'
@@ -191,8 +246,9 @@ function Register-CalendarTask {
     $candidate = $candidate.AddDays(7)
   }
 
-  $arguments = "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$ScriptPath`" -Frequency $Frequ"
-  if ($SendToPrinter) { $arguments += ' -SendToPrinter' }
+  $arguments = "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$ScriptPath`" -Frequency $Frequ -OutputDir `"$OutputDir`""
+  if ($NoShow) { $arguments += ' -NoShow' }
+  if ($PrintOnCompletion) { $arguments += ' -SendToPrinter' }
 
   $action   = New-ScheduledTaskAction -Execute $pwshExe -Argument $arguments
   $trigger  = New-ScheduledTaskTrigger -Weekly -WeeksInterval $weeksInterval -DaysOfWeek Monday -At $candidate
@@ -206,10 +262,10 @@ function Register-CalendarTask {
 # ==============================================================================
 # 4. INITIALIZATION & DATA RETRIEVAL
 # ==============================================================================
-$IcsUrl = Get-OrPromptIcsUrl -ForcePrompt:$ResetUrl
+$IcsUrl = Get-OrPromptIcsUrl -ForcePrompt:$ResetUrl -RegistryKeyPath $RegKeyPath -EnvironmentVariableName $EnvVarName
 
 if ($parsedTime) {
-  Register-CalendarTask -ValidTime $parsedTime -Frequ $Frequency -ScriptPath $PSCommandPath
+  Register-CalendarTask -ValidTime $parsedTime -Frequ $Frequency -ScriptPath $PSCommandPath -OutputDir $OutputDir -NoShow:$NoShow -PrintOnCompletion:$SendToPrinter
 }
 
 # Time window calculation from current Monday
@@ -250,22 +306,45 @@ $events = @{}
 
 # Registers an event entry for each active day within the calendar window
 function Add-SpanEvent {
-  param (
+  [CmdletBinding()]
+  param(
     [datetime]$StartDate,
     [datetime]$EndDate,
     [string]$TimeStr,
-    [string]$Summary
+  [string]$Summary,
+  [datetime]$CalendarStart,
+  [datetime]$CalendarEnd,
+  [hashtable]$Events
   )
 
+  <#
+  .SYNOPSIS
+    Adds a calendar event to each visible day in the calendar window.
+  .PARAMETER StartDate
+    The event start time.
+  .PARAMETER EndDate
+    The event end time.
+  .PARAMETER TimeStr
+    The display time for a timed event.
+  .PARAMETER Summary
+    The event summary.
+  .PARAMETER CalendarStart
+    The first visible calendar day.
+  .PARAMETER CalendarEnd
+    The exclusive end of the calendar window.
+  .PARAMETER Events
+    The mutable day-keyed event collection.
+  #>
+
   # Overlap check with calendar window
-  if ($StartDate -ge $endWindow -or $EndDate -le $startMonday) {
+  if ($StartDate -ge $CalendarEnd -or $EndDate -le $CalendarStart) {
     return
   }
 
-  $loopDate = if ($StartDate -lt $startMonday) { $startMonday } else { $StartDate.Date }
+  $loopDate = if ($StartDate -lt $CalendarStart) { $CalendarStart } else { $StartDate.Date }
 
   # All-day events have midnight as exclusive EndDate
-  $lastDate = if ($EndDate.Date -lt $endWindow) {
+  $lastDate = if ($EndDate.Date -lt $CalendarEnd) {
     if ($EndDate.TimeOfDay.TotalSeconds -eq 0 -and $EndDate -gt $StartDate) {
       $EndDate.Date.AddDays(-1)
     }
@@ -274,24 +353,24 @@ function Add-SpanEvent {
     }
   }
   else {
-    $endWindow.AddDays(-1)
+    $CalendarEnd.AddDays(-1)
   }
 
   $isMultiDay = ($EndDate - $StartDate).TotalHours -gt 24
 
   while ($loopDate -le $lastDate) {
     $dKey = $loopDate.ToString('yyyy-MM-dd')
-    if (-not $events.ContainsKey($dKey)) {
-      $events[$dKey] = [System.Collections.Generic.List[PSObject]]::new()
+    if (-not $Events.ContainsKey($dKey)) {
+      $Events[$dKey] = [System.Collections.Generic.List[PSObject]]::new()
     }
 
     # Visual indicator when the event started before the calendar grid
     $displayPrefix = ''
-    if ($loopDate -eq $startMonday -and $StartDate -lt $startMonday) {
+    if ($loopDate -eq $CalendarStart -and $StartDate -lt $CalendarStart) {
       $displayPrefix = '>> '
     }
 
-    $events[$dKey].Add([PSCustomObject]@{
+    $Events[$dKey].Add([PSCustomObject]@{
       Time       = if ($isMultiDay) { '' } else { $TimeStr }
       Summary    = "$displayPrefix$Summary"
       IsMultiDay = $isMultiDay
@@ -363,7 +442,7 @@ foreach ($line in $unfoldedLines) {
       $durationSpan = $baseEnd - $baseStart
 
       if ([string]::IsNullOrWhiteSpace($evRRule)) {
-        Add-SpanEvent -StartDate $baseStart -EndDate $baseEnd -TimeStr $timeStr -Summary $evSummary
+        Add-SpanEvent -StartDate $baseStart -EndDate $baseEnd -TimeStr $timeStr -Summary $evSummary -CalendarStart $startMonday -CalendarEnd $endWindow -Events $events
       }
       else {
         # Parse RRULE parameters
@@ -388,7 +467,7 @@ foreach ($line in $unfoldedLines) {
           $curEnd = $curStart + $durationSpan
 
           if ($freq -eq 'DAILY') {
-            Add-SpanEvent -StartDate $curStart -EndDate $curEnd -TimeStr $timeStr -Summary $evSummary
+            Add-SpanEvent -StartDate $curStart -EndDate $curEnd -TimeStr $timeStr -Summary $evSummary -CalendarStart $startMonday -CalendarEnd $endWindow -Events $events
             $curStart = $curStart.AddDays($interval)
           }
           elseif ($freq -eq 'WEEKLY') {
@@ -401,22 +480,22 @@ foreach ($line in $unfoldedLines) {
                   $targetStart = $weekBase.AddDays($dayMap[$bd])
                   $targetEnd   = $targetStart + $durationSpan
                   if ($targetStart -ge $baseStart -and $targetStart -le $untilDate) {
-                    Add-SpanEvent -StartDate $targetStart -EndDate $targetEnd -TimeStr $timeStr -Summary $evSummary
+                    Add-SpanEvent -StartDate $targetStart -EndDate $targetEnd -TimeStr $timeStr -Summary $evSummary -CalendarStart $startMonday -CalendarEnd $endWindow -Events $events
                   }
                 }
               }
             }
             else {
-              Add-SpanEvent -StartDate $curStart -EndDate $curEnd -TimeStr $timeStr -Summary $evSummary
+              Add-SpanEvent -StartDate $curStart -EndDate $curEnd -TimeStr $timeStr -Summary $evSummary -CalendarStart $startMonday -CalendarEnd $endWindow -Events $events
             }
             $curStart = $curStart.AddDays(7 * $interval)
           }
           elseif ($freq -eq 'MONTHLY') {
-            Add-SpanEvent -StartDate $curStart -EndDate $curEnd -TimeStr $timeStr -Summary $evSummary
+            Add-SpanEvent -StartDate $curStart -EndDate $curEnd -TimeStr $timeStr -Summary $evSummary -CalendarStart $startMonday -CalendarEnd $endWindow -Events $events
             $curStart = $curStart.AddMonths($interval)
           }
           else {
-            Add-SpanEvent -StartDate $curStart -EndDate $curEnd -TimeStr $timeStr -Summary $evSummary
+            Add-SpanEvent -StartDate $curStart -EndDate $curEnd -TimeStr $timeStr -Summary $evSummary -CalendarStart $startMonday -CalendarEnd $endWindow -Events $events
             break
           }
           $stepCount++
@@ -606,6 +685,74 @@ Set-Content -Path $tempHtml -Value $fullHtml -Encoding utf8
 # ==============================================================================
 # 6. HEADLESS PDF EXPORT VIA EDGE
 # ==============================================================================
+function Invoke-EdgePdfExport {
+  [CmdletBinding()]
+  param(
+    [string]$EdgePath,
+    [string]$InputFileUri,
+    [string]$OutputPdf
+  )
+
+  <#
+  .SYNOPSIS
+      Renders the calendar HTML to PDF with captured Edge diagnostics.
+  .PARAMETER EdgePath
+      The Edge executable path.
+  .PARAMETER InputFileUri
+      The calendar HTML file URI.
+  .PARAMETER OutputPdf
+      The expected PDF output path.
+  #>
+
+  if (-not (Test-Path -LiteralPath $EdgePath)) {
+    throw "Microsoft Edge was not found at '$EdgePath'."
+  }
+
+  $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+  $startInfo.FileName = $EdgePath
+  $startInfo.UseShellExecute = $false
+  $startInfo.CreateNoWindow = $true
+  $startInfo.RedirectStandardOutput = $true
+  $startInfo.RedirectStandardError = $true
+  foreach ($argument in @(
+      '--headless',
+      '--disable-gpu',
+      '--run-all-compositor-stages-before-draw',
+      '--no-pdf-header-footer',
+      "--print-to-pdf=$OutputPdf",
+      $InputFileUri
+    )) {
+    $null = $startInfo.ArgumentList.Add($argument)
+  }
+
+  $edgeProcess = [System.Diagnostics.Process]::new()
+  $edgeProcess.StartInfo = $startInfo
+  if (-not $edgeProcess.Start()) {
+    throw 'Microsoft Edge could not be started for PDF rendering.'
+  }
+
+  $standardOutputTask = $edgeProcess.StandardOutput.ReadToEndAsync()
+  $standardErrorTask = $edgeProcess.StandardError.ReadToEndAsync()
+  $edgeProcess.WaitForExit()
+  $standardOutput = $standardOutputTask.GetAwaiter().GetResult()
+  $standardError = $standardErrorTask.GetAwaiter().GetResult()
+
+  $unexpectedErrors = @($standardError -split "`r?`n" | Where-Object {
+      -not [string]::IsNullOrWhiteSpace($_) -and
+      $_ -notmatch 'Every renderer should have at least one task provided by a primary task provider\.' -and
+      $_ -notmatch '^\d+ bytes written to file '
+    })
+  $hasPdf = (Test-Path -LiteralPath $OutputPdf) -and ((Get-Item -LiteralPath $OutputPdf).Length -gt 0)
+  if ($edgeProcess.ExitCode -ne 0 -or -not $hasPdf) {
+    $diagnostics = @($standardOutput, $standardError | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) -join [Environment]::NewLine
+    throw "Edge PDF rendering failed (exit code $($edgeProcess.ExitCode)). $diagnostics"
+  }
+
+  foreach ($errorLine in $unexpectedErrors) {
+    Write-Warning "Edge diagnostic: $errorLine"
+  }
+}
+
 Write-Host '[3/3] Rendering PDF via Headless Edge...' -ForegroundColor Cyan
 
 $edgePath = 'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe'
@@ -615,14 +762,7 @@ if (-not (Test-Path -Path $edgePath)) {
 
 $fileUri = "file:///$($tempHtml -replace '\\', '/')"
 
-Start-Process -FilePath $edgePath -ArgumentList @(
-  '--headless',
-  '--disable-gpu',
-  '--run-all-compositor-stages-before-draw',
-  '--no-pdf-header-footer',
-  "--print-to-pdf=`"$outputPdf`"",
-  "`"$fileUri`""
-) -Wait -NoNewWindow
+Invoke-EdgePdfExport -EdgePath $edgePath -InputFileUri $fileUri -OutputPdf $outputPdf
 
 Write-Host "PDF created successfully: $outputPdf" -ForegroundColor Green
 
@@ -631,6 +771,6 @@ if ($SendToPrinter) {
   Start-Process -FilePath $outputPdf -Verb Print -PassThru | Out-Null
 }
 
-if ($OpenAfterExport) {
+if (-not $NoShow) {
   Start-Process -FilePath $outputPdf
 }

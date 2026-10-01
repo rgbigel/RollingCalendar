@@ -5,7 +5,7 @@ globs: "*"
 ---
 <!-- ===================================================================== -->
 <!-- ANTIGRAVITY RULE MIRROR                                               -->
-<!-- Source Authority: Workspace_AI/.agents/rules/PowerShellRules.md  -->
+<!-- Source Authority: LCM_AI/.agents/rules/PowerShellRules.md  -->
 <!-- Activation: Workspace Automatic                                       -->
 <!-- ===================================================================== -->
 # File: PowerShellRules.md

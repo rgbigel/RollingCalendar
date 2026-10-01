@@ -8,7 +8,7 @@ globs: "*"
 Module: SubsystemGovernancePolicy  
 Purpose: Governs disjunct Subsystem repositories (e.g. Home Assistant OS), dedicated subsystem inventories, JIT ephemeral write authentication, host hardware interlocks, and log segregation.  
 Path: .agents/rules/SubsystemGovernancePolicy.md  
-Authors: Rolf, Workspace_AI Governance  
+Authors: Rolf, LCM_AI Governance  
 Version: 8.0.0  
 Status: Authoritative Policy  
 Date: 2026-09-26  
@@ -17,7 +17,7 @@ Date: 2026-09-26
 
 ## 1. Scope & Motivation
 
-A **Subsystem** represents an autonomous runtime or supervisory domain (e.g., `HaSSD06` running Home Assistant OS, or `Workspace_Supervision` operating continuous task telemetry and status observation) that has specialized operational lifecycles distinct from general scripting utilities. 
+A **Subsystem** represents an autonomous runtime or supervisory domain (e.g., `HaSSD06` running Home Assistant OS, or `LCM_Supervision` operating continuous task telemetry and status observation) that has specialized operational lifecycles distinct from general scripting utilities. 
 
 While Subsystems inherit standard LCM **documentation and quality gate rules**, their internal parts (integrations, devices, tasks, telemetry ledgers, entities) require domain-specific configuration management and elevated safety protocols.
 
@@ -27,7 +27,7 @@ While Subsystems inherit standard LCM **documentation and quality gate rules**, 
 
 ### RULE-SUB-001: Subsystem Classification & Documentation Conformance
 1. A repository classified as `subsystem` in `.lcm/config.json` `MUST` fully implement standard LCM **Tripartite Documentation** (`docs/Architecture.md`, `docs/Requirements.md`, `docs/Implementation.md`) and the universal runbook (`install/Installation.md`).
-2. The root `Workspace_Inventory` tracks Subsystems at the macro Git level, while delegating internal part tracking to the Subsystem's dedicated inventory engine.
+2. The root `LCM_Inventory` tracks Subsystems at the macro Git level, while delegating internal part tracking to the Subsystem's dedicated inventory engine.
 
 ### RULE-SUB-002: Dedicated Subsystem Inventory Engine & Auto-Acceptance Invariant
 1. Subsystems `MUST` maintain an independent internal inventory ledger at `data/subsystem_inventory.json` and a rendered summary at `docs/SUBSYSTEM_DASHBOARD.md`.
@@ -50,7 +50,7 @@ While Subsystems inherit standard LCM **documentation and quality gate rules**, 
    - All state modifications `MUST` execute through the 5-stage pipeline: `(1) Pre-Flight State Snapshot` $\rightarrow$ `(2) Beyond Compare Visual Payload Gate` $\rightarrow$ `(3) Atomic API Dispatch` $\rightarrow$ `(4) Tiered Polling Health & Liveness Loop (up to 10m for Add-ons, up to 20m for Core, up to 30–45m for Host OS reboots / schema migrations)` $\rightarrow$ `(5) Automated Rollback on Failure`.
 
 ### RULE-SUB-005: Strict Log & Evidence Segregation
-1. Host-level CM activities (`Workspace_Inventory/logs/cm_activity.log`) record only macro repository lifecycle milestones.
+1. Host-level CM activities (`LCM_Inventory/logs/cm_activity.log`) record only macro repository lifecycle milestones.
 2. Granular runtime events, entity modifications, and API traces `MUST` write exclusively to the Subsystem's internal log directory (`<Subsystem>/logs/subsystem_activity.log` and `<Subsystem>/logs/api_traffic.log`).
 3. Outgoing and incoming log messages `MUST` pass through automatic regex sanitization to redact any authorization headers, bearer tokens, or password strings.
 

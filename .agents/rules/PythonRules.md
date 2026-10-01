@@ -8,7 +8,7 @@ globs: "*.py"
 Module: PythonRules  
 Purpose: Authoritative rule definitions for Python code quality, import ordering, string formatting, and linter compliance.  
 Path: .agents/rules/PythonRules.md  
-Authors: Rolf, Workspace_AI Engine  
+Authors: Rolf, LCM_AI Engine  
 Version: 8.1.0  
 Status: Authoritative Invariant Rule  
 Date: 2026-09-26  

@@ -8,7 +8,7 @@ globs: "*.ps1,*.psm1,*.psd1"
 Module: PowerShellStandardsPolicy  
 Purpose: Defines mandatory PowerShell 7 (pwsh) standards for strict mode resilience, verb compliance, string interpolation, intermediate code execution, and pipeline hygiene.  
 Path: .agents/rules/PowerShellStandardsPolicy.md  
-Authors: Rolf, Workspace_AI Governance  
+Authors: Rolf, LCM_AI Governance  
 Version: 8.6.0  
 Status: Authoritative Policy  
 Date: 2026-09-26  
@@ -125,7 +125,7 @@ Whenever an existing script is modified, the `Date:` field (and changelog/versio
 ### RULE-PS-009: Mandatory Structured Tool Logging & Summary Invariants
 All PowerShell automation tools performing system mutations, diagnostics, remediations, repairs, or administrative tasks `MUST`:
 1. **Persistent Audit Logging & Timestamp Precision**: Automatically write a timestamped log file (named `<ToolName>-yyyyMMdd_HHmmss.log`) to the repository-scoped `logs/` directory or `.lcm/logs/` (with fallback to `$env:TEMP/lcm/logs/` if repository logs are unavailable or unwritable) with at least second-level precision (`yyyy-MM-dd HH:mm:ss` or `yyyy-MM-dd HH:mm:ss.fff`). The minute-level format (`YYYYMMDD_HHMM`) is restricted strictly to assistant chat response headers and `MUST NOT` be used in tools or log entries.
-2. **Structured Log Levels**: Classify every message using standard log levels: `[INFO]`, `[WARN]`, `[ERROR]`, `[DEBUG]`, `[ACTION]`, `[SUMMARY]` (converging on the `SharedModules/Logging` standard).
+2. **Structured Log Levels**: Classify every message using standard log levels: `[INFO]`, `[WARN]`, `[ERROR]`, `[DEBUG]`, `[ACTION]`, `[SUMMARY]` (converging on the `LCM_Shared/Logging` standard).
 3. **Mandatory `[SUMMARY]` Footer**: Emit a standardized terminal and log summary block upon completion displaying:
    - Tool name
    - Version number
@@ -148,7 +148,7 @@ All PowerShell scripts, automation tools, and diagnostic reporters that launch i
 1. **Interactive Session Isolation Awareness**:
    Never assume script execution is running inside the interactive desktop. When executed from background agent sessions, IDE workers, or automated task runners (Session 0), raw `Start-Process` invocations are isolated and completely invisible on the user's physical screen.
 2. **Mandatory Desktop Dispatch Routing**:
-   Inspect whether `Invoke-InteractiveDesktop.ps1` exists in the workspace (`D:\Git_Repositories\tools\Invoke-InteractiveDesktop.ps1` or `$toolsDir`). If present, GUI execution `MUST` be routed through `Invoke-InteractiveDesktop.ps1` using:
+   Inspect whether `Invoke-InteractiveDesktop.ps1` exists in the workspace (`D:\Git_Repositories\LCM_Tools\Invoke-InteractiveDesktop.ps1` or `$toolsDir`). If present, GUI execution `MUST` be routed through `Invoke-InteractiveDesktop.ps1` using:
    ```powershell
    $dispatcher = Join-Path $toolsDir "Invoke-InteractiveDesktop.ps1"
    if (Test-Path $dispatcher) {

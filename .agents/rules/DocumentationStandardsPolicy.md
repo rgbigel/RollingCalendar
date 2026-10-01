@@ -8,7 +8,7 @@ globs: "*.md"
 Module: DocumentationStandardsPolicy  
 Purpose: Defines mandatory tripartite repository documentation standards, audience scoping, and DOX metadata invariants across all governed repositories.  
 Path: .agents/rules/DocumentationStandardsPolicy.md  
-Authors: Rolf, Workspace_AI Governance  
+Authors: Rolf, LCM_AI Governance  
 Version: 8.6.0  
 Status: Authoritative Policy  
 Date: 2026-09-26  
@@ -79,7 +79,7 @@ Every LCM-governed repository that deploys or installs operational payloads `MUS
    - For complex multi-phase deployments, steps may be cleanly separated into numbered sub-documents in `install/` (e.g., `01-Prerequisites.md`, `02-Configuration.md`, `03-Deployment.md`), centrally indexed and orchestrated by `Installation.md`.
    - `install/` contains purely procedural runbooks and deployment scripts; it `MUST NOT` contain a `README.md`.
 3. **Decoupled Cross-Repository Boundaries**:
-   - External dependencies (such as `SharedModules` or `Workspace_Inventory`) `MUST` be represented strictly as prerequisite assertions and linkage steps without duplicating foreign repository code or internals.
+   - External dependencies (such as `LCM_Shared` or `LCM_Inventory`) `MUST` be represented strictly as prerequisite assertions and linkage steps without duplicating foreign repository code or internals.
 
 ---
 
@@ -97,7 +97,7 @@ Whenever a new major LCM version $M$ (e.g. `v6.0.0`, `v7.0.0`) is established an
 ### RULE-DOC-006: Major Release Retention Horizon Policy & Evolution History Taxonomy
 At the time of a major release push $M$ (e.g. `v6.0.0`, `v7.0.0`):
 1. **2-Major-Release Retention Horizon ($M - 2$)**:
-   - All transient operational logs (`tools/logs/*.log`, `Workspace_Inventory/logs/*.log`), temporary scratch dumps (`scratch/`), and legacy deletion trees (`Deletions/`) from major releases older than 2 major versions ($\le M - 2$) `MUST` be completely flushed.
+   - All transient operational logs (`tools/logs/*.log`, `LCM_Inventory/logs/*.log`), temporary scratch dumps (`scratch/`), and legacy deletion trees (`Deletions/`) from major releases older than 2 major versions ($\le M - 2$) `MUST` be completely flushed.
    - For major release $M=6$, all artifacts and deletion trees from major releases $\le 4$ are purged.
    - Transient logs within the active operational window ($M$ and $M-1$) are retained.
 2. **Permanent Historical Evolution Logs Exemption**:

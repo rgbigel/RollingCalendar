@@ -8,7 +8,7 @@ globs: "*"
 Module: MethodEfficiencyPolicy  
 Purpose: Defines auto-acceptance, zero-test-trigger invariants, and method efficiency rules for generated inventory telemetry, logs, DOIT mode execution velocity, and tool discovery.  
 Path: .agents/rules/MethodEfficiencyPolicy.md  
-Authors: Rolf, Workspace_AI Engine  
+Authors: Rolf, LCM_AI Engine  
 Version: 8.6.0  
 Status: Authoritative Invariant Rule  
 Date: 2026-09-26  
@@ -27,10 +27,10 @@ To maximize **Method Efficiency** and eliminate ceremonial overhead, this policy
 
 ### RULE-EFF-001 (Mechanical Artifact Auto-Acceptance)
 Changes strictly modifying tool-generated evidence, audit databases, dashboard summaries, and logs are **automatically accepted** without requiring manual review gates. This applies to:
-* `Workspace_Inventory/data/inventory.json`
-* `Workspace_Inventory/docs/INVENTORY_DASHBOARD.md`
-* `Workspace_Inventory/data/baselines/*.json`
-* `Workspace_Inventory/logs/*.log`
+* `LCM_Inventory/data/inventory.json`
+* `LCM_Inventory/docs/INVENTORY_DASHBOARD.md`
+* `LCM_Inventory/data/baselines/*.json`
+* `LCM_Inventory/logs/*.log`
 * `*_Inventory/data/subsystem_inventory.json` (Subsystem Inventories e.g. `HaSSD06_Inventory`)
 * `*_Inventory/docs/SUBSYSTEM_DASHBOARD.md`
 * `*_Inventory/logs/*.log` and `*_Inventory/data/proposals/*.json`

@@ -8,7 +8,7 @@ globs: "*"
 Module: DisplayStandardsPolicy  
 Purpose: Governs presentation standards, CSS design system tokens, sticky double-row header layouts, theme persistence, and interactive desktop dispatching across all LCM-generated HTML viewers and dashboards.  
 Path: .agents/rules/DisplayStandardsPolicy.md  
-Authors: Rolf, Workspace_AI Governance  
+Authors: Rolf, LCM_AI Governance  
 Version: 8.5.1
 Status: Authoritative Policy
 Date: 2026-09-26

@@ -5,7 +5,7 @@ globs: "*"
 ---
 <!-- ===================================================================== -->
 <!-- ANTIGRAVITY RULE MIRROR                                               -->
-<!-- Source Authority: Workspace_Inventory/.agents/rules/macro-definitions.md -->
+<!-- Source Authority: LCM_Inventory/.agents/rules/macro-definitions.md -->
 <!-- Activation: Workspace Automatic                                       -->
 <!-- ===================================================================== -->
 # macro-definitions.md
@@ -18,7 +18,7 @@ globs: "*"
 # update-policy: manual
 
 ## Syntax Convention: Antigravity IDE Bare-Word Standard
-In the Antigravity IDE environment, typing the `@` character triggers the IDE's interactive context-attachment popup (`@Files`, `@Docs`, `@Git`). Therefore, bare-word command invocations (`ToolExplorer`, `ShowTools`, `tools`, `ar`, `bcr`, `COMPLETE`, `PUSH`, `DO <#>`, etc.) are the primary and preferred syntax. The `@` prefix remains supported as a backward-compatible alias.
+In the Antigravity IDE environment, typing the `@` character triggers the IDE's interactive context-attachment popup (`@Files`, `@Docs`, `@Git`). Therefore, bare-word command invocations (`ToolExplorer`, `ShowTools`, `tools`, `ar`, `bcr`, `COMPLETE`, `PUBLISH`, `DO <#>`, etc.) are the primary and preferred syntax. The `@` prefix remains supported as a backward-compatible alias.
 
 MACRO: technical
 - description: enforce strict technical, ascii-only, deterministic output
@@ -62,7 +62,7 @@ MACRO: ToolExplorer
 - parameters:
   - -Audience <User|Dev|All>: pre-filter audience category (defaults to 'User')
   - -Group <Name>: pre-filter by group or subsystem (e.g. 'HaSSD06', 'LCM', 'SystemConfiguration')
-  - -Subsystem <Name>: direct filter for specific subsystem (e.g. 'HaSSD06', 'Workspace_Inventory')
+  - -Subsystem <Name>: direct filter for specific subsystem (e.g. 'HaSSD06', 'LCM_Inventory')
   - -HaSSD06 (or -Ha): quick switch to filter directly to Home Assistant HaSSD06 tools
   - -Role <RoleName>: pre-filter by functional role (e.g. 'QualityGate', 'ReviewGate', 'Elevation', 'DesktopGUI')
   - -Tool <ToolName>: pre-select and highlight specific tool
@@ -95,25 +95,37 @@ MACRO: BCR
 - syntax: bcr <repo> [commit] | BCR <repo> [commit]
 - aliases: bcr, BCR, @bcr
 - rules:
-  - 'bcr <repo>' or 'BCR <repo>' -> executes 'pwsh -File Workspace_Inventory/tools/Invoke-BeyondCompareReview.ps1 -RepositoryName <repo>'
-  - 'bcr <repo> <commit>' -> executes 'pwsh -File Workspace_Inventory/tools/Invoke-BeyondCompareReview.ps1 -RepositoryName <repo> -BaseCommit <commit>'
+  - 'bcr <repo>' or 'BCR <repo>' -> executes 'pwsh -File LCM_Inventory/tools/Invoke-BeyondCompareReview.ps1 -RepositoryName <repo>'
+  - 'bcr <repo> <commit>' -> executes 'pwsh -File LCM_Inventory/tools/Invoke-BeyondCompareReview.ps1 -RepositoryName <repo> -BaseCommit <commit>'
 
 MACRO: COMPLETE
 - description: submit a completed review result, close the Beyond Compare review window, run quality gates, and commit locally
 - syntax: complete [repo] | COMPLETE [repo]
 - aliases: complete, COMPLETE, completed
 - rules:
-  - 'complete <repo>' or 'COMPLETE <repo>' -> executes 'pwsh -File Workspace_Inventory/tools/Submit-ReviewResult.ps1 -RepositoryPath <repo> -Result Completed'
+  - 'complete <repo>' or 'COMPLETE <repo>' -> executes 'pwsh -File LCM_Inventory/tools/Submit-ReviewResult.ps1 -RepositoryPath <repo> -Result Completed'
   - automatically closes matching Beyond Compare review window
   - never invokes a remote push
 
-MACRO: PUSH
-- description: publish a completed proposal cohort and Workspace_Inventory to their remotes in lockstep
-- syntax: push [repo] | PUSH [repo]
-- aliases: push, PUSH
+MACRO: FixDocumentation
+- description: reconcile explicit CRP/BUG documentation payloads into the LCM tripartite documents
+- syntax: FixDocumentation <CRP/BUG scope> [-Apply] | fixdocumentation <CRP/BUG scope> [-Apply]
+- aliases: fixdocumentation, FixDocumentation
 - rules:
-  - 'push <repo>' or 'PUSH <repo>' -> executes 'pwsh -File Workspace_Inventory/tools/Invoke-WorkspacePush.ps1 -Repositories <repo>'
-  - requires every target proposal to be completed and Workspace_Inventory to be ahead before any remote dispatch
+  - default behavior is dry run and writes a reconciliation manifest without changing documents
+  - `-Apply` writes only explicit `Documentation Updates` payloads declared by the selected bundles
+  - conflicting or ambiguous payloads stop without modifying documentation
+  - an applied update requires BCompare review before local commit
+  - executes `pwsh -File LCM_Inventory/tools/Fix-Documentation.ps1 <scope>` (or `.lcm/Cmd/FixDocumentation.cmd`)
+
+MACRO: PUBLISH
+- description: publish a completed proposal cohort and LCM_Inventory to their remotes in lockstep
+- syntax: publish [repo] | PUBLISH [repo]
+- aliases: publish, PUBLISH, push, PUSH
+- rules:
+  - 'publish <repo>' or 'PUBLISH <repo>' -> executes 'pwsh -File LCM_Inventory/tools/Invoke-WorkspacePush.ps1 -Repositories <repo>'
+  - `push` and `PUSH` remain backward-compatible aliases.
+  - requires every target proposal to be completed and LCM_Inventory to be ahead before any remote dispatch
 
 MACRO: tsr (Legacy / Automated)
 - note: Superseded by persistent TimestampHeaderRule codified in InvariantRules.md. Automated on every turn; manual macro invocation is deprecated.
@@ -123,6 +135,6 @@ MACRO: ar
 - syntax: ar [offset] | AnalyzeReasoning [offset]
 - aliases: ar, AR, AnalyzeReasoning
 - rules:
-  - 'ar', 'AR', or 'AnalyzeReasoning' -> executes 'pwsh -File Workspace_Inventory/tools/Invoke-ReasoningAnalysis.ps1 -Offset 0' (or .lcm/Cmd/ar.cmd)
-  - 'ar <offset>' or 'AnalyzeReasoning <offset>' -> executes 'pwsh -File Workspace_Inventory/tools/Invoke-ReasoningAnalysis.ps1 -Offset <offset>'
-  - generates a structured report in Workspace_Inventory/data/logs/ containing Execution Trace, Error Triage & Avoidance Matrix, and Decision Rationale
+  - 'ar', 'AR', or 'AnalyzeReasoning' -> executes 'pwsh -File LCM_Inventory/tools/Invoke-ReasoningAnalysis.ps1 -Offset 0' (or .lcm/Cmd/ar.cmd)
+  - 'ar <offset>' or 'AnalyzeReasoning <offset>' -> executes 'pwsh -File LCM_Inventory/tools/Invoke-ReasoningAnalysis.ps1 -Offset <offset>'
+  - generates a structured report in LCM_Inventory/data/logs/ containing Execution Trace, Error Triage & Avoidance Matrix, and Decision Rationale

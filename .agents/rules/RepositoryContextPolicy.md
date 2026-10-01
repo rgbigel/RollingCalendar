@@ -8,7 +8,7 @@ globs: "*"
 Module: RepositoryContextPolicy  
 Purpose: Defines automatic active-document repository detection, fast-tier context priming, candidate fallback, and scan optimization invariants.  
 Path: .agents/rules/RepositoryContextPolicy.md  
-Authors: Rolf, Workspace_AI  
+Authors: Rolf, LCM_AI  
 Version: 8.0.0  
 Status: Authoritative Invariant Rule  
 Date: 2026-09-26  
@@ -38,8 +38,8 @@ The agent `MUST NOT` run multi-step recursive discovery scans (`list_dir`, broad
 
 ### `RULE-CTX-004` (Methodology Awareness)
 The agent `MUST` remain aware of the global LCM triad at all times:
-* **`Workspace_AI`**: Governs release baselines (v4.3.0), templates, and quality gates.
-* **`Workspace_Inventory`**: Configuration Management engine, audit ledger, and cross-repo CR indexing.
-* **`SharedModules`**: Reusable functional PowerShell atom library (`Logging`, `VolumeAtoms`, `BcdAtoms`).
+* **`LCM_AI`**: Governs release baselines (v4.3.0), templates, and quality gates.
+* **`LCM_Inventory`**: Configuration Management engine, audit ledger, and cross-repo CR indexing.
+* **`LCM_Shared`**: Reusable functional PowerShell atom library (`Logging`, `VolumeAtoms`, `BcdAtoms`).
 
 

@@ -9,8 +9,8 @@ param()
     Purpose: Guards PowerShell entrypoint and advanced-function contracts.
     Path: RollingCalendar/tests/Invoke-RollingCalendar.Tests.ps1
     Authors: rgbig, Workspace_AI Governance
-    Version: 1.1.0
-    Date: 2026-09-30
+    Version: 1.2.0
+    Date: 2026-10-02
 #>
 
 Describe 'Invoke-RollingCalendar quality contract' {
@@ -69,5 +69,17 @@ Describe 'Invoke-RollingCalendar quality contract' {
     $scriptText | Should -Match 'Every renderer should have at least one task provided by a primary task provider'
     $scriptText | Should -Match '\^\\d\+ bytes written to file '
     $scriptText | Should -Match '\$edgeProcess\.ExitCode -ne 0 -or -not \$hasPdf'
+  }
+
+  It 'defines the Culture parameter with German default and Locale alias' {
+    $scriptText | Should -Match "\[Alias\('Locale'\)\]"
+    $scriptText | Should -Match '\[string\]\$Culture = ''de-DE'''
+    $scriptText | Should -Match '\[System\.Globalization\.CultureInfo\]::GetCultureInfo\(\$Culture\)'
+  }
+
+  It 'implements dynamic localized weekday headers and short date formatting' {
+    $scriptText | Should -Match 'GetAbbreviatedDayName'
+    $scriptText | Should -Match 'TwoLetterISOLanguageName'
+    $scriptText | Should -Match 'v\$ScriptVersion'
   }
 }

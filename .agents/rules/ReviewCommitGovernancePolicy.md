@@ -6,23 +6,26 @@ globs: "*"
 # File: ReviewCommitGovernancePolicy.md
 
 Module: ReviewCommitGovernancePolicy  
-Purpose: Defines mandatory review-gated commit rules, review disposition handling, forced commit overrides, audit logging, and dual-session directory junction reviews.  
+Purpose: Defines mandatory review-gated commit rules, review disposition handling, authorized bypass exceptions, audit logging, and single-session directory junction reviews.  
 Path: .agents/rules/ReviewCommitGovernancePolicy.md  
 Authors: Rolf, LCM_AI Governance  
-Version: 8.2.1  
+Version: 8.4.0  
 Status: Authoritative Policy  
-Date: 2026-09-30  
+Date: 2026-10-02  
 
 ---
 
 ## 1. Governance Rules
 
 ### RULE-REV-001: Mandatory Review-Gated Commits & Gate 2 Non-Circumvention Invariant
-1. **Mandatory Visual Review Gate (Gate 2)**: Every Git commit action for source code, configuration, tools, modules, or structural assets (`*.ps1`, `*.psm1`, `.vscode/settings.json`, `.lcm/*`, `docs/*`) in any LCM-governed repository requires a prior validated review disposition (`COMPLETED` or `COMPLETED_WITH_EDITS`) produced via the formal Beyond Compare 5 visual review gate (`Invoke-BeyondCompareReview.ps1`).
-2. **Strict Gate 2 Non-Circumvention for All Items**:
-   - **Even critical, urgent, or internally generated BUGs MUST NOT circumvent Gate 2.**
-   - While `BUG` items execute in `DOIT` mode (`always-proceed = $true`) without a Gate 1 planning pause, they `MUST HALT` at Gate 2 for operator review before reaching `COMMITTED`.
-3. **Conversational Directives Do Not Waive Gating**: Explicit user instructions in chat (e.g. "yes, remove that", "fix this error") grant authority to execute file edits and staging, but **DO NOT waive the Beyond Compare visual review gate**. The agent `MUST` launch `Invoke-BeyondCompareReview.ps1` and await user review sign-off / folder clearance before stepping to `COMMITTED`.
+1. **Mandatory Visual Review Gate (Gate 2)**: Every Git commit action for source code, configuration, tools, modules, or structural assets (`*.ps1`, `*.psm1`, `.vscode/settings.json`, `.lcm/*`, `docs/*`) in any LCM-governed repository requires a prior validated review disposition (`COMPLETED` or `COMPLETED_WITH_EDITS`) produced via the formal Beyond Compare 5 visual review gate (`Invoke-BeyondCompareReview.ps1`), with transparent junction traversal via `FollowSymLinks` (`RULE-REV-008`).
+2. **Strict Gate 2 Non-Circumvention Baseline**: Beyond Compare visual diff review is non-circumventable for code/tools/specs across all items by default. Even critical, urgent, or internally generated BUGs normally execute in `DOIT` mode (`always-proceed = $true`) without a Gate 1 planning pause, but halt at Gate 2 for operator review before reaching `COMMITTED`.
+3. **Authorized Exceptions to Gating**:
+   There are two (2) authorized exceptions to this rule:
+   1. **Explicit Operator Directive (`IMMEDIATELY`, `FORCE`)**: The user can explicitly INSTRUCT (`IMMEDIATELY`, `FORCE`) to bypass review confirmation and advance directly into the Implementation Phase / review commit without confirming the visual review.
+   2. **Critical Flow-Impeding BUG & Loop Breaker**: The system has detected a BUG that impedes the intended flow in a critical manner, especially when the task would lead to an unavoidable loop or recursion that the user cannot circumvent or fix. In this scenario, the system may proceed autonomously, engaging `-MinimalTests` to prevent cascading test recursions, but there `MUST BE NO MORE THAN TWO (2) ATTEMPTS` to resolve the issue before halting.
+   - **Mandatory Audit Logging Invariant**: In either exception case, the fact, rationale, and specific trigger `MUST` be explicitly documented in the accompanying `BUG` or `CRP` proposal bundle and recorded in the Configuration Management ledger.
+   - **Quality Gate, Syntax & Language Non-Bypass Invariant**: Taking an authorized exception to bypass manual visual review strictly waives only the interactive visual diff inspection step. It `MUST NEVER` bypass, waive, or relax syntax validation (PowerShell AST parser checks, Python compilation), language rules ([`LanguagePolicy.md`](file:///d:/Git_Repositories/.agents/rules/LanguagePolicy.md) English invariant), or baseline repository readiness quality gates (`Test-RepoReadiness.ps1`). All modified files `MUST` compile cleanly with zero syntax errors and satisfy all language and formatting invariants prior to commit.
 4. **Exemption Scope**: Only purely mechanical telemetry artifacts defined in `RULE-EFF-001` (`inventory.json`, `INVENTORY_DASHBOARD.md`, `out/test_results.json`, and activity logs) are exempt from visual review gating.
 5. **BCompare Materiality Authority**: Beyond Compare is the sole authority for whether a difference is material. The review launcher MUST enable its insignificant-difference controls, and post-review staging MUST record only explicit operator selections made in the visual session. Raw-byte, Git-diff, line-ending, or whitespace comparisons MUST NOT create review candidates or obstruct review disposition.
 6. **Non-Interactive / Headless Environment Fallback**: If Beyond Compare 5 or Session 1 interactive GUI execution is physically unavailable (e.g. running inside a headless CI/CD runner, container, or non-GUI remote SSH terminal), the agent `SHALL` present unified console diffs alongside the proposal's `Walkthrough.md` verification evidence for explicit terminal disposition before committing.
@@ -32,6 +35,7 @@ When a review outcome is recorded as `Completed with Edits` (or `Completed with 
 1. The modified codebase `MUST` execute and satisfy all repository quality gates (`Test-RepoReadiness.ps1`).
 2. The modifications `MUST NOT` introduce rule violations, regression errors, or broken dependencies.
 3. Upon satisfying all quality gates, the state `SHALL` be classified as fully `COMPLETED` and committed to Git.
+4. When `-MinimalTests` is engaged under operator instruction or automated loop circumvention, the readiness gate executes fast-tier syntax and structure validation while bypassing heavy integration cascades; the resulting commit is recorded as `completed [minimal-tests]` with `"test_scope": "minimal"` per `RULE-LCM-023`.
 
 ### RULE-REV-003: Override & Force Authority for Rejected/Deferred States
 If a review outcome is `REJECTED` or `DEFERRED`:

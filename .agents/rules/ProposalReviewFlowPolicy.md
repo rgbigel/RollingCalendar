@@ -9,9 +9,9 @@ Module: ProposalReviewFlowPolicy
 Purpose: Enforces ticket-first proposals, batch commands, Beyond Compare 5 review gates, granularity controls, and LCM_Inventory dual-commit synchronization.  
 Path: .agents/rules/ProposalReviewFlowPolicy.md  
 Authors: Rolf, LCM_AI Governance  
-Version: 8.8.0
+Version: 9.0.0
 Status: Authoritative Policy  
-Date: 2026-09-28
+Date: 2026-10-02
 
 ---
 
@@ -42,7 +42,7 @@ The review frequency is governed by `review_granularity` in `LCM_Inventory`:
 - Can be set via `set review granularity <coarse|tight>` or inline `do #1-#3 Proposals --tight`.
 
 ### RULE-LCM-004: Visual Diff Review & Exemption Scope
-- **Governed Repositories & Root Container**: Every governed repository and the Root Container (`D:\Git_Repositories`) `MUST` undergo visual diff review via `Invoke-BeyondCompareReview.ps1 <RepoName>` before commit.
+- **Governed Repositories & Root Container**: Every governed repository and the Root Container (`D:\Git_Repositories`) `MUST` undergo visual diff review via `Invoke-BeyondCompareReview.ps1 <RepoName>` before commit, subject to authorized exceptions in `RULE-REV-001`.
 - **Dual-Session Junction Review**: For repositories containing NTFS directory junctions (e.g. `.agents` pointing to `LCM_AI\.agents`, or `.agents\rules` pointing to `LCM_AI\.agents\rules`), `Invoke-BeyondCompareReview.ps1` `MUST` automatically dispatch a second Beyond Compare review session targeting the live junction destination on the right pane per `RULE-REV-008`.
 - **Privileged Subsystem Data Exemption vs. Tool Scrutiny**:
   - **Dynamic Configuration & Ledger Data Exemption (`RULE-EFF-001`)**: Ledger data, review staging receipts, baseline manifests, telemetry logs, and scratch generation outputs located in `LCM_Inventory` (`data/`, `logs/`, `scratch/`) are auto-accepted mechanical evidence and exempt from visual diff review stops.
@@ -75,12 +75,16 @@ The review frequency is governed by `review_granularity` in `LCM_Inventory`:
      - `LCM_Inventory/data/proposals/plans/Proposal-{ID:03d}_{CR_ID}_Walkthrough.md`
    - Explicit relative links `plan_path` and `walkthrough_path` `MUST` be recorded in `proposals.json`.
 
-### RULE-LCM-008: BUG Lifecycle, DOIT Mode & Review Decision Non-Circumvention Invariant
+### RULE-LCM-008: BUG Lifecycle, DOIT Mode & Review Decision Non-Circumvention Baseline
 1. **Birth in `DOIT` Mode**: When a `BUG` is born (whether reported by the operator or self-discovered during test execution), it automatically initializes in **`DOIT` Mode** (`always-proceed = $true`).
    - The agent scaffolds the BUG proposal bundle (`docs/Proposals/BUG-<nnn>-[Slug]/`) and immediately executes code modifications, script adjustments, and unit verification tests continuously without pausing for a Gate 1 planning approval.
-2. **Strict Review Decision Non-Circumvention Invariant**:
-   - **Even a critical, urgent, or internally generated BUG MUST NOT circumvent the Review Decision checkpoint.**
-   - Once the fix is verified in the working tree and logged in `Walkthrough.md`, the agent `MUST UNCONDITIONALLY HALT` at the Review Decision checkpoint, dispatch the visual review session (`Invoke-BeyondCompareReview.ps1`), and await explicit operator review disposition. The agent `MUST NEVER` self-commit or self-publish bug fixes.
+2. **Review Decision Non-Circumvention Baseline & Authorized Exceptions**:
+   - By default, even a critical, urgent, or internally generated BUG halts at the Review Decision checkpoint (Gate 2).
+   - Once the fix is verified in the working tree and logged in `Walkthrough.md`, the agent normally dispatches the visual review session (`Invoke-BeyondCompareReview.ps1`) and awaits operator review disposition.
+   - **Authorized Gating Exceptions (`RULE-REV-001`)**: Review gate confirmation may be bypassed only if:
+     1. The user explicitly instructs (`IMMEDIATELY`, `FORCE`) to advance directly into implementation or commit.
+     2. A critical system BUG impedes the intended flow and leads to an unavoidable loop/recursion that the user cannot avoid or fix, bound strictly by the 2-attempt loop breaker (`RULE-LCM-017`).
+     - In either case, the bypass justification `MUST` be logged in the proposal bundle and Configuration Management ledger.
 
 ### RULE-LCM-009: Scope and Version-Explicit CRP Naming Standard
 1. **Canonical Directory Bundle Convention**: All Change Request Proposals (CRPs) `MUST` follow the standardized bundle directory structure:
@@ -123,13 +127,13 @@ The review frequency is governed by `review_granularity` in `LCM_Inventory`:
 
 ### RULE-LCM-014: Dual-Gate Architecture & CRP Planning Gate Invariant
 1. **CRP Birth in SUGGESTED State**: For any non-bug Change Request Proposal (`CRP`), the proposal `MUST` birth in the **`SUGGESTED`** state under the Normal Review Cycle.
-2. **Gate 1 Planning Halt**: The AI agent `MUST` scaffold the Proposal Bundle directory, register the entry in `proposals.json`, present the plan, and `UNCONDITIONALLY HALT`. No source code, permanent script, configuration, or test file may be modified, created, or deleted while at Gate 1.
+2. **Gate 1 Planning Halt**: The AI agent `MUST` scaffold the Proposal Bundle directory, register the entry in `proposals.json`, present the plan, and `UNCONDITIONALLY HALT`. No source code, permanent script, configuration, or test file may be modified, created, or deleted while at Gate 1, unless explicitly instructed (`IMMEDIATELY`, `FORCE`) by the operator per `RULE-REV-001`.
 3. **Gate 1 Activation Triggers**:
    - **`Proceed`**: Advances state from `SUGGESTED` $\rightarrow$ `IN_PROGRESS` in the Normal Review Cycle (interactive checkpoints if open questions or design alternatives exist).
    - **`do` / `do <ID>`**: Advances state to `IN_PROGRESS` and activates **`DOIT` Mode** (`always-proceed = $true`), executing planned modifications continuously until the Review Decision checkpoint is reached per `RULE-EFF-004`.
 4. **Strict Dual-Gate Lifecycle**:
    - **Gate 1 (Planning Gate)**: Propose solution / Register proposal bundle & plan $\rightarrow$ `STOP` and await explicit operator direction (`Proceed` or `do`). (BUGs bypass Gate 1 into `DOIT` mode).
-   - **Review Decision Checkpoint (BC5 Review)**: Implement approved changes $\rightarrow$ Present visual diffs / walkthrough / BC5 review $\rightarrow$ `STOP` and await operator review disposition. **Mandatory for all proposals, including BUGs.**
+   - **Review Decision Checkpoint (BC5 Review / Gate 2)**: Implement approved changes $\rightarrow$ Present visual diffs / walkthrough / BC5 review $\rightarrow$ `STOP` and await operator review disposition. Mandatory for all proposals, subject strictly to the two authorized exceptions in `RULE-REV-001`.
 
 ### RULE-LCM-015: Strict Intake Classification Gate
 1. **Intake Signal Classification**:
@@ -220,5 +224,16 @@ The review frequency is governed by `review_granularity` in `LCM_Inventory`:
    - Prior to modifying any file that was touched in the preceding turn, the agent `MUST` verify that the user has accepted or dismissed the review.
 3. **Buffer Clobber Prevention**:
    - The agent `MUST` ensure `"files.autoSave": "off"` is maintained in workspace settings (`.vscode/settings.json`), preventing the IDE from auto-saving stale in-memory editor buffers over freshly written disk files.
+
+### RULE-LCM-023: Minimal Tests Single-Cycle Execution Switch & State Reflection Invariant
+1. **Single-Cycle Ephemeral Scope**:
+   - The `-MinimalTests` switch provides a single-cycle execution mode restricting the Test Readiness gate to fast hygiene checks (PowerShell AST parsing, Python compilation, UTF-8/CRLF validation, and English language checks).
+   - Heavy test cascades (elevated integration suites, Session 0 harnesses, deep subsystem DAGs) are skipped during the single active proposal or declared batch execution.
+   - Upon completion of the target item's readiness check, review submission, or turn conclusion, testing scope unconditionally auto-resets to standard full verification (`full`). Minimal testing `MUST NOT` persist as an ambient workspace state.
+2. **Authoritative State Field Representation**:
+   - When an item is verified and completed under `-MinimalTests`, its authoritative **`state`** (not status) attribute in `LCM_Inventory/data/proposals/proposals.json` `MUST` explicitly record `"state": "completed [minimal-tests]"`, with metadata attribute `"test_scope": "minimal"`.
+   - The CM Control Hub and status displays render this state with distinct indicator chips (`COMPLETED ⚠️ MINIMAL`) to provide transparent operator visibility into verification depth.
+3. **Audit Ledger & Review Evidence**:
+   - Every activation of Minimal Tests `MUST` record an entry in `LCM_Inventory/logs/cm_activity.log` and capture `"test_scope": "minimal"` in the generated review receipt (`LCM_Inventory/data/reviews/review_*.json`).
 
 

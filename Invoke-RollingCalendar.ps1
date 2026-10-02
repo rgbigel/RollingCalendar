@@ -13,6 +13,10 @@ param (
   [string]$OutputDir = 'C:\Temp',
 
   [Parameter()]
+  [Alias('Locale')]
+  [string]$Culture = 'de-DE',
+
+  [Parameter()]
   [switch]$NoShow,
 
   [Parameter()]
@@ -34,15 +38,25 @@ param (
     Purpose: Renders a rolling Outlook ICS calendar as a landscape PDF.
     Path: RollingCalendar/Invoke-RollingCalendar.ps1
     Authors: rgbig
-    Version: 1.1.0
-    Date: 2026-09-30
+    Version: 1.2.0
+    Date: 2026-10-02
 #>
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 if ($Help) {
-  Write-Host 'Usage: pwsh -File Invoke-RollingCalendar.ps1 [-Time HH:mm|HHmm|yyyyMMdd_HHmm|yyyyMMdd_HHmmss] [-Frequency 1w|2w|3w|4w] [-OutputDir <directory>] [-NoShow] [-SendToPrinter] [-ResetUrl] [-Help]'
+  Write-Host 'Usage: pwsh -File Invoke-RollingCalendar.ps1 [-Time HH:mm|HHmm|yyyyMMdd_HHmm|yyyyMMdd_HHmmss] [-Frequency 1w|2w|3w|4w] [-OutputDir <directory>] [-Culture <culture-name>] [-NoShow] [-SendToPrinter] [-ResetUrl] [-Help]'
+  return
+}
+
+$ScriptVersion = '1.2.0'
+
+try {
+  $cultureInfo = [System.Globalization.CultureInfo]::GetCultureInfo($Culture)
+}
+catch {
+  Write-Error "Invalid culture or locale identifier '$Culture': $($_.Exception.Message)"
   return
 }
 
@@ -105,7 +119,7 @@ $parsedTime = Resolve-ValidTime -RawTime $Time
 if ($parsedTime -and (-not (Test-IsAdmin))) {
   Write-Host 'Task scheduling requires administrator privileges. Starting elevation...' -ForegroundColor Yellow
   $allArgs = @('-ExecutionPolicy', 'Bypass', '-File', "`"$PSCommandPath`"", '-Time', "`"$parsedTime`"", '-Frequency', "`"$Frequency`"")
-  $allArgs += @('-OutputDir', "`"$OutputDir`"")
+  $allArgs += @('-OutputDir', "`"$OutputDir`"", '-Culture', "`"$Culture`"")
   if ($NoShow)          { $allArgs += '-NoShow' }
   if ($SendToPrinter)   { $allArgs += '-SendToPrinter' }
   if ($ResetUrl)        { $allArgs += '-ResetUrl' }
@@ -246,7 +260,7 @@ function Register-CalendarTask {
     $candidate = $candidate.AddDays(7)
   }
 
-  $arguments = "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$ScriptPath`" -Frequency $Frequ -OutputDir `"$OutputDir`""
+  $arguments = "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$ScriptPath`" -Frequency $Frequ -OutputDir `"$OutputDir`" -Culture `"$Culture`""
   if ($NoShow) { $arguments += ' -NoShow' }
   if ($PrintOnCompletion) { $arguments += ' -SendToPrinter' }
 
@@ -256,7 +270,7 @@ function Register-CalendarTask {
 
   Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
   Write-Host ("Task schedule registered: Every $weeksInterval week(s) on Mondays at $ValidTime.") -ForegroundColor Green
-  Write-Host ("Next scheduled run: $($candidate.ToString('MM/dd/yyyy HH:mm')) (calendar will be created immediately).") -ForegroundColor DarkGray
+  Write-Host ("Next scheduled run: $($candidate.ToString('g', $cultureInfo)) (calendar will be created immediately).") -ForegroundColor DarkGray
 }
 
 # ==============================================================================
@@ -532,10 +546,10 @@ for ($d = 0; $d -lt $totalDays; $d++) {
   $isTodayClass = if ($cellDate -eq $today) { ' is-today' } else { '' }
 
   $dayLabel = if ($cellDate.Day -eq 1 -or $d -eq 0) {
-    '{0}. {1}' -f $cellDate.Day, ($cellDate.ToString('MMM'))
+    '{0}. {1}' -f $cellDate.Day, ($cellDate.ToString('MMM', $cultureInfo))
   }
   else {
-    $cellDate.Day.ToString()
+    $cellDate.Day.ToString($cultureInfo)
   }
 
   $eventItemsHtml = ''
@@ -557,15 +571,26 @@ for ($d = 0; $d -lt $totalDays; $d++) {
 "@
 }
 
-$periodStr = '{0:MM/dd/yyyy} - {1:MM/dd/yyyy}' -f $startMonday, ($startMonday.AddDays($totalDays - 1))
+$weekdayHeaders = @(
+  [DayOfWeek]::Monday,
+  [DayOfWeek]::Tuesday,
+  [DayOfWeek]::Wednesday,
+  [DayOfWeek]::Thursday,
+  [DayOfWeek]::Friday,
+  [DayOfWeek]::Saturday,
+  [DayOfWeek]::Sunday
+) | ForEach-Object { "    <div class=`"weekday-header`">$($cultureInfo.DateTimeFormat.GetAbbreviatedDayName($_))</div>" }
+$weekdayHeadersHtml = $weekdayHeaders -join "`r`n"
+
+$periodStr = '{0} - {1}' -f $startMonday.ToString('d', $cultureInfo), ($startMonday.AddDays($totalDays - 1)).ToString('d', $cultureInfo)
 $titleStr  = "$weekCount-Week Preview ($periodStr)"
 
 $fullHtml = @"
 <!DOCTYPE html>
-<html lang="en">
+<html lang="$($cultureInfo.TwoLetterISOLanguageName)">
 <head>
   <meta charset="UTF-8">
-  <title>$titleStr</title>
+  <title>$titleStr - v$ScriptVersion</title>
   <style>
     :root {
       --border-color: #cbd5e1;
@@ -657,16 +682,10 @@ $fullHtml = @"
 <body>
   <div class="header">
     <div class="title">$weekCount-Week Preview</div>
-    <div class="period">$periodStr</div>
+    <div class="period">$periodStr (v$ScriptVersion)</div>
   </div>
   <div class="grid">
-    <div class="weekday-header">Mon</div>
-    <div class="weekday-header">Tue</div>
-    <div class="weekday-header">Wed</div>
-    <div class="weekday-header">Thu</div>
-    <div class="weekday-header">Fri</div>
-    <div class="weekday-header">Sat</div>
-    <div class="weekday-header">Sun</div>
+$weekdayHeadersHtml
     $gridCellsHtml
   </div>
 </body>

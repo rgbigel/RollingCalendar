@@ -9,9 +9,9 @@ Module: ProposalReviewFlowPolicy
 Purpose: Enforces ticket-first proposals, batch commands, Beyond Compare 5 review gates, granularity controls, and LCM_Inventory dual-commit synchronization.  
 Path: .agents/rules/ProposalReviewFlowPolicy.md  
 Authors: Rolf, LCM_AI Governance  
-Version: 9.0.0
+Version: 9.2.0
 Status: Authoritative Policy  
-Date: 2026-10-02
+Date: 2026-10-03
 
 ---
 
@@ -22,16 +22,16 @@ When working in LCM mode (`active`), all user ideas, questions, and exploratory 
 - The AI agent `MUST NOT` execute file modifications, code rewrites, or commits immediately upon receiving an initial idea or question.
 - When discussion yields a conclusive path of action, register the Change Request / Proposal with State `suggested` in `LCM_Inventory\data\proposals\proposals.json`.
 
-### RULE-LCM-002: Batch Execution & Control Commands
+### RULE-LCM-002: Batch Execution, Control Commands & Flow Switch Activation
 Proposals transition through the defined lifecycle via deterministic operator commands:
-- **`Proceed` / `Proceed <ID>`**: **Single-step status increment**. Deterministically advances matching proposal(s) forward by exactly one discrete state:
-  - At Gate 1: Advances from `SUGGESTED` $\rightarrow$ `IN_PROGRESS` (initiates implementation in Normal Cycle).
-   - At the Review Decision checkpoint: Advances from `REVIEW` $\rightarrow$ `COMMITTED` (satisfies visual review, records disposition, increments SemVer, and commits to local Git).
-- **`do <all, #n, #n-#m> Proposals`**: **Activates `DOIT` mode** (`always-proceed = $true`). Bypasses Gate 1 planning pauses and executes planned tool operations, script runs, and file edits continuously until the downstream Review Decision checkpoint is reached per `RULE-EFF-004`.
-- **`COMPLETE` / `COMPLETE ALL`**: Records a completed visual review, commits locally, and transitions the reviewed proposal to `COMPLETED`. It never pushes to a remote.
-- **`PUBLISH`**: Publishes only a preflighted cohort of `COMPLETED` proposals and `LCM_Inventory` to their remotes in lockstep (`COMPLETED` $\rightarrow$ `PUBLISHED`). `PUSH` remains a backward-compatible command alias. Suggested, in-progress, review, and uncommitted items are strictly excluded.
-- **`delete <all, #n, #n-#m> Proposals`**: Sets matching proposals to `deleted` and clears associated CRs.
-- **`defer <all, #n, #n-#m> Proposals`**: Sets matching proposals to `deferred`.
+- **`Proceed` / `Proceed <ID>`**: **Single-step status increment**. Deterministically advances matching proposal(s) forward by exactly one discrete Sync Point along the flat lifecycle continuum (`Suggested` $\rightarrow$ `Scoped` $\rightarrow$ `Decided` $\rightarrow$ `In_Progress` $\rightarrow$ `Verified` $\rightarrow$ `Committed` $\rightarrow$ `Published`).
+- **`do <all, #n, #n-#m> Proposals`**: **Sets flow switches!** Specifically activates the **`-DOIT` switch** (`always-proceed = $true`), bypassing Gate 1 planning pauses and executing continuously through `In_Progress` and verification until the downstream Review Decision checkpoint (Gate 2) is reached per `RULE-EFF-004`.
+- **`hold <all, #n, #n-#m> Proposals`**: Sets the **`HELD` disposition** with a mandatory reason, suspending active work at its current Sync Point. Pauses all active flow switches. (Supersedes legacy `defer`).
+- **`resume <all, #n, #n-#m> Proposals`**: **Reactivation action** that clears the `HELD` disposition and restores the proposal to active flow at its suspended Sync Point. Resume is an operator action, NOT a milestone or status.
+- **`COMPLETE` / `COMPLETE ALL`**: Records a completed visual review, creates local commits, and advances the reviewed proposal to `Committed`. It never pushes to a remote.
+- **`PUBLISH`**: Publishes only a preflighted cohort of `Committed` proposals and `LCM_Inventory` to their remotes in lockstep (`Committed` $\rightarrow$ `Published`). `PUSH` remains a backward-compatible command alias. Suggested, scoped, in-progress, and uncommitted items are strictly excluded.
+- **`cancel <all, #n, #n-#m>`**: **Administrative ticket withdrawal at Gate 1**. Indicates the proposal is dropped, infeasible, or superseded during intake, scoping, or planning ratification. Zero working-tree modifications, zero code reverts, and zero rule modifications occur. The proposal transitions to terminal disposition `Cancelled` and all active flow switches are unconditionally turned **OFF**.
+- **`reject <all, #n, #n-#m>`**: **Implementation rejection at Gate 2**. Indicates the physical implementation or review failed visual inspection, automated verification, or operator acceptance during the `Verified` review checkpoint. Actively rolls back and undoes working-tree modifications introduced by the proposal (for batches/cohorts, reverts all proposals in the cohort back to the clean pre-CRP baseline). The proposal transitions to terminal disposition `Rejected` and all active flow switches are unconditionally turned **OFF**.
 - **`give open Proposals`**: Returns numbered list of active proposals (`#n`).
 - **`give repos under review`**: Displays repositories with uncommitted changes, their BC5 review status, and commit readiness.
 
@@ -39,6 +39,7 @@ Proposals transition through the defined lifecycle via deterministic operator co
 The review frequency is governed by `review_granularity` in `LCM_Inventory`:
 - **`coarse` (Default)**: Executes all proposals in the batch, runs automated quality gates, then presents a **single BC5 review stop** for the combined changes across the repository before commit.
 - **`tight`**: Implements each proposal incrementally with intermediate test runs and a **dedicated BC5 review stop per proposal**.
+- **Idempotent Single-Window Review Invariant**: A review stop `MUST NOT` open a duplicate window or redundant tab if the comparison or proposal is already open or currently being reviewed. In Beyond Compare 5, re-invoking review for an open comparison must simply refresh the existing session/tab in place and bring it to focus; opening two windows for the same comparison is strictly prohibited.
 - Can be set via `set review granularity <coarse|tight>` or inline `do #1-#3 Proposals --tight`.
 
 ### RULE-LCM-004: Visual Diff Review & Exemption Scope
@@ -63,27 +64,100 @@ The review frequency is governed by `review_granularity` in `LCM_Inventory`:
 3. **Push Auto-Reset Invariant (Self-Healing Governance)**:
    - Neither `LCM OFF` nor `Testing OFF` may remain active after publication. Upon any push invocation (`PUSH`, `Invoke-WorkspacePush.ps1`), both **LCM Mode** and **Testing Mode** `MUST` unconditionally reset to `ON` (`active`).
 
-### RULE-LCM-007: Dual-State Proposal Lifecycle & CM Plan Archive Invariant
-1. **Dual-State Separation**: Every proposal in `LCM_Inventory/data/proposals/proposals.json` `MUST` track both:
-   - **Governance Plan State (`state`)**: Document approval state (`bug`, `suggested`, `approved`, `deferred`, `rejected`, `completed`, `pushed`).
-   - **Implementation Progress State (`progress_state`)**: Physical execution progress (`undecided`, `queued`, `in_progress`, `verification`, `completed`, `pushed`, `blocked`, `failed`).
-2. **Initial Invariant**: Every newly submitted proposal and unapproved plan `MUST` initialize with `progress_state: "undecided"`.
-3. **Pushed Lifecycle Transition**: Upon successful execution of `Invoke-WorkspacePush.ps1` (or CM Control Hub Push), proposals in `completed` state whose origin repository was pushed `MUST` transition to `pushed` (`pushed_at` timestamp recorded).
-4. **Mandatory CM Plan & Walkthrough Archival**:
+### RULE-LCM-007: Flat Lifecycle Continuum, Sync Points, Dispositions & CM Plan Archive Invariant
+1. **Single-Dimensional "Flat" Status Continuum**:
+   - Status is strictly single-dimensional. Multi-dimensional status architectures (such as conflicting `progress_state` vs `state` where internal state stalled on `approved` while physical progress moved secretly) are prohibited.
+   - External status binds the internal state directly at **7 canonical Sync Points (Milestones)**. When identical, the single canonical name `MUST` be used across all rules, tools, and UI displays:
+     `Suggested` $\rightarrow$ `Scoped` $\rightarrow$ `Decided` $\rightarrow$ `In_Progress` $\rightarrow$ `Verified` $\rightarrow$ `Committed` $\rightarrow$ `Published`.
+2. **Canonical Sync Points (Milestones)**:
+   - **`Suggested` (0)**: Initial proposal registration / intake. Proposal bundle scaffolded in `docs/Proposals/`; Gate 1 planning pause.
+   - **`Scoped` (1)**: Proposal bound to target repository, primary app (`App: #`), and constituent manifest.
+   - **`Decided` (2)**: Architecture, requirements, and plan ratified (`Approved` disposition); Gate 1 passed.
+   - **`In_Progress` (3)**: Active implementation underway; continuous code modifications and unit tests executing.
+   - **`Verified` (4)**: Implementation complete; minimal / automated tests passed; Gate 2 visual diff review stop dispatched.
+   - **`Committed` (5)**: Gate 2 visual review accepted (`Approved` disposition); review receipt filed in `reviews/`; local Git commit created.
+   - **`Published` (6)**: Walkthrough archived in CM; lockstep preflight verified; remotes synchronized (`Published` preferred over `Pushed`).
+3. **Dispositions vs. Status**:
+   Dispositions and Plan State are not part of any CM-flow rule as separate dimensions, but are conditions or markers resulting from status and actions:
+   - **`BUG`**: A disposition (not a substitute term for CRP). When assigned to a proposal, it sets flow switches to force flow exceptions—specifically activating the **`-DOIT` switch** (`always-proceed = $true`), bypassing Gate 1 planning pauses, while halting at Gate 2 visual review (`RULE-LCM-008`).
+   - **`HELD`**: An exceptional disposition suspending a proposal at its current Sync Point. There is NO `defer` action or status anymore—it is simply `HELD`. When `HELD`, active flow switches are paused. Cleared by the `resume` action.
+   - **`Approved`**: A disposition recorded at sync points (specifically at `Decided` for Gate 1 plan approval, and `Committed` for Gate 2 review acceptance).
+   - **`Completed`**: Disposition indicating completed review and commit prior to or at `Published`.
+   - **`Cancelled`**: Terminal administrative disposition at Gate 1 indicating ticket withdrawal (proposal dropped, infeasible, or superseded during intake, scoping, or planning ratification). Involves **zero code reverts**, zero working-tree modifications, and zero rule modifications. Reaching `Cancelled` unconditionally turns **OFF** all active flow switches.
+   - **`Rejected`**: Terminal implementation disposition at Gate 2 indicating rejection of physical modifications during visual diff review (`Verified` checkpoint). Actively triggers **rollback and removal of uncommitted working-tree modifications** introduced by the proposal back to the clean pre-CRP baseline (or full cohort rollback for batches). Reaching `Rejected` unconditionally turns **OFF** all active flow switches.
+4. **Governed Flow Switches**:
+   Flow switches modify execution behavior and velocity across sync points:
+   - **`-DOIT`** (`always-proceed = $true`): Activated by `do` command or `BUG` disposition. Bypasses Gate 1 planning pause and executes continuously through `In_Progress` to `Verified`.
+   - **`-Force` / `-Immediately`**: Authorizes bypass of Gate 2 visual diff review under strict emergency exception criteria (`RULE-REV-001`).
+   - **`-MinimalTests`**: Single-cycle execution switch restricting test DAG to fast regression checks (`RULE-LCM-023`).
+   - **`-Coarse` / `-Tight`**: Granularity switch controlling single combined review stop per batch (`-Coarse`) vs. stop per proposal (`-Tight`) (`RULE-LCM-003`).
+   - **`LCM OFF`**: Emergency escape switch suspending governance scaffolding and gating (`RULE-LCM-006`).
+   - **`Testing OFF`**: Deferred deep testing switch suppressing heavy cascades during interactive development (`RULE-LCM-006`).
+5. **Mandatory CM Plan & Walkthrough Archival**:
    - All Markdown implementation plans and execution walkthroughs `MUST` be persistently archived in the governed CM repository under:
      - `LCM_Inventory/data/proposals/plans/Proposal-{ID:03d}_{CR_ID}_Plan.md`
      - `LCM_Inventory/data/proposals/plans/Proposal-{ID:03d}_{CR_ID}_Walkthrough.md`
    - Explicit relative links `plan_path` and `walkthrough_path` `MUST` be recorded in `proposals.json`.
+6. **Authoritative Flat Lifecycle Matrix & State Diagram**:
 
-### RULE-LCM-008: BUG Lifecycle, DOIT Mode & Review Decision Non-Circumvention Baseline
-1. **Birth in `DOIT` Mode**: When a `BUG` is born (whether reported by the operator or self-discovered during test execution), it automatically initializes in **`DOIT` Mode** (`always-proceed = $true`).
-   - The agent scaffolds the BUG proposal bundle (`docs/Proposals/BUG-<nnn>-[Slug]/`) and immediately executes code modifications, script adjustments, and unit verification tests continuously without pausing for a Gate 1 planning approval.
+   #### A. Canonical Flat Lifecycle Matrix
+
+   | Sync Point (Milestone) | Canonical Status Name | Operator Action | Dispositions at Sync Point | Active Flow Switches | CM Side Effect & Invariant |
+   |:---|:---|:---|:---|:---|:---|
+   | **0. Suggested** | `Suggested` | `suggest` | `BUG` (sets `-DOIT`) | Default | Bundle scaffolded in `docs/Proposals/`; Gate 1 pause. |
+   | **1. Scoped** | `Scoped` | `scope` | — | Default | Bound to origin repo, primary app (`App: #`), and constituent manifest. |
+   | **2. Decided** | `Decided` | `approve` / `Proceed` | `Approved` | Default | Gate 1 passed; architecture and plan ratified. |
+   | **3. In_Progress** | `In_Progress` | `start` / `do` (sets `-DOIT`) | — | `-DOIT` (if `do`/`BUG`) | Active code modification; unit tests executing. |
+   | **4. Verified** | `Verified` | `verify` / `bcr` | — | `-MinimalTests` (optional) | Implementation complete; tests pass; Gate 2 BC5 review dispatched. |
+   | **5. Committed** | `Committed` | `reviewed` / `commit` / `COMPLETE` | `Approved`, `Completed` | `-Force` (if authorized) | Review accepted; receipt in `reviews/`; local Git commit created. |
+   | **6. Published** | `Published` | `publish` / `push` | `Completed` | Auto-Reset (`ON`) | Walkthrough archived; lockstep preflight passed; remotes pushed. |
+   | **[Condition] Held** | Current Sync Point | `hold` | `HELD` | Paused | Work suspended; reason recorded in CM ledger. Cleared by `resume`. |
+   | **[Terminal] Cancelled** | Discarded (Gate 1) | `cancel` | `Cancelled` | Turned OFF | Administrative withdrawal at Gate 1; zero working-tree modifications; zero code reverts. |
+   | **[Terminal] Rejected** | Discarded (Gate 2) | `reject` | `Rejected` | Turned OFF | Implementation rejection at Gate 2; working-tree modifications actively rolled back to pre-CRP baseline. |
+
+   #### B. Canonical Flat Lifecycle State Diagram
+
+   ```mermaid
+   stateDiagram-v2
+       direction TB
+
+       [*] --> Suggested: Intake (suggest)
+       Suggested --> Scoped: Scope (bind repo / app)
+       Scoped --> Decided: Decide / Approve Plan (Gate 1 Passed)
+       Decided --> In_Progress: Start / do (sets -DOIT)
+       In_Progress --> Verified: Verify Tests Passed
+       Verified --> Committed: Accept BC5 Review & Commit (Gate 2 Passed)
+       Committed --> Published: Publish / Push to Remote
+       Published --> [*]
+
+       %% Exception Flow: HELD Suspension
+       In_Progress --> Held: hold (sets HELD disposition)
+       Scoped --> Held: hold
+       Decided --> Held: hold
+       Held --> In_Progress: resume (clears HELD disposition)
+
+       %% Exception Flow: Gate 1 Administrative Withdrawal (Zero Reverts)
+       Suggested --> Cancelled: cancel (Gate 1 withdrawal / zero reverts)
+       Scoped --> Cancelled: cancel (Gate 1 withdrawal / zero reverts)
+       Decided --> Cancelled: cancel (Gate 1 withdrawal / zero reverts)
+
+       %% Exception Flow: Gate 2 Implementation Rejection (Rollback to Baseline)
+       Verified --> Rejected: reject (Gate 2 review rejection / rollback to baseline)
+       In_Progress --> Rejected: reject (aborted implementation / rollback to baseline)
+
+       Cancelled --> [*]
+       Rejected --> [*]
+   ```
+
+### RULE-LCM-008: BUG Disposition, DOIT Mode & Review Decision Non-Circumvention Baseline
+1. **Flow Exception via `BUG` Disposition**: When a proposal is assigned the `BUG` disposition (whether reported by the operator or self-discovered during test execution), it sets flow switches to force flow exceptions. Specifically, it automatically activates the **`-DOIT` switch** (`always-proceed = $true`).
+   - The agent scaffolds the proposal bundle (`docs/Proposals/BUG-<nnn>-[Slug]/`) and immediately executes code modifications, script adjustments, and unit verification tests continuously without pausing for a Gate 1 planning approval.
 2. **Review Decision Non-Circumvention Baseline & Authorized Exceptions**:
-   - By default, even a critical, urgent, or internally generated BUG halts at the Review Decision checkpoint (Gate 2).
-   - Once the fix is verified in the working tree and logged in `Walkthrough.md`, the agent normally dispatches the visual review session (`Invoke-BeyondCompareReview.ps1`) and awaits operator review disposition.
+   - By default, even a critical or urgent proposal with disposition `BUG` halts at the Review Decision checkpoint (Gate 2) upon reaching Sync Point `Verified`.
+   - Once the fix is verified in the working tree and logged in `Walkthrough.md`, the agent dispatches the visual review session (`Invoke-BeyondCompareReview.ps1`) and awaits operator review disposition.
    - **Authorized Gating Exceptions (`RULE-REV-001`)**: Review gate confirmation may be bypassed only if:
      1. The user explicitly instructs (`IMMEDIATELY`, `FORCE`) to advance directly into implementation or commit.
-     2. A critical system BUG impedes the intended flow and leads to an unavoidable loop/recursion that the user cannot avoid or fix, bound strictly by the 2-attempt loop breaker (`RULE-LCM-017`).
+     2. A critical system bug impedes the intended flow and leads to an unavoidable loop/recursion that the user cannot avoid or fix, bound strictly by the 2-attempt loop breaker (`RULE-LCM-017`).
      - In either case, the bypass justification `MUST` be logged in the proposal bundle and Configuration Management ledger.
 
 ### RULE-LCM-009: Scope and Version-Explicit CRP Naming Standard
@@ -235,5 +309,15 @@ The review frequency is governed by `review_granularity` in `LCM_Inventory`:
    - The CM Control Hub and status displays render this state with distinct indicator chips (`COMPLETED ⚠️ MINIMAL`) to provide transparent operator visibility into verification depth.
 3. **Audit Ledger & Review Evidence**:
    - Every activation of Minimal Tests `MUST` record an entry in `LCM_Inventory/logs/cm_activity.log` and capture `"test_scope": "minimal"` in the generated review receipt (`LCM_Inventory/data/reviews/review_*.json`).
+
+---
+
+### RULE-LCM-024: Mandatory Pre-Handoff Verification & Zero-Assumption Testing Invariant
+1. **Pre-Handoff Verification Gate**: Before advancing any proposal to `Verified`, proposing Gate 2 visual review, or handing the turn back to the operator:
+   - The AI agent `MUST` validate every created or modified script, module, or configuration file using its language's native AST parser or compiler (`[System.Management.Automation.Language.Parser]::ParseInput()` for PowerShell, `python -m py_compile` for Python, `ConvertFrom-Json` for JSON). Zero syntax errors or parse warnings are tolerated.
+   - The AI agent `MUST` execute the relevant unit test suites (Pester, pytest, or readiness scripts).
+2. **Zero-Assumption Testing Invariant**:
+   - The AI agent `MUST NOT` skip tests or assert that code is valid, ready, or functional based on visual inspection alone.
+   - Declaring or reporting completion, review readiness, or success without executing mechanical verification is strictly prohibited.
 
 

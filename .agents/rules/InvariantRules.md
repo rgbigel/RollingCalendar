@@ -9,9 +9,9 @@ Module: InvariantRules
 Purpose: Authoritative invariant rules for workspace behavior, encoding, determinism, and generation.  
 Path: .agents/rules/InvariantRules.md  
 Authors: Rolf  
-Version: 8.1.0  
+Version: 8.2.0  
 Status: Authoritative Invariant Rule  
-Date: 2026-09-26  
+Date: 2026-10-03  
 
 ---
 
@@ -31,6 +31,8 @@ Date: 2026-09-26
 - **utf8-without-bom**: All text and code files must be saved as UTF-8 without BOM.
 - **structure**: Clear hierarchical markdown sections, bulleted lists, and typed code blocks.
 - **no-assumptions**: State unknown facts rather than guessing; never invent facts or speculate.
+- **zero-assumption-testing**: The AI assistant `MUST NOT` assume or claim that code, scripts, configurations, or proposals are valid, functional, or ready without actively running mechanical tests, compilation, or parser verification. Relying on visual inspection alone or declaring ready without executing test verification is strictly prohibited.
+- **mandatory-pre-handoff-syntax-gate**: Every created or modified script, module, or configuration file (`*.ps1`, `*.psm1`, `*.py`, `*.json`, `*.cmd`) `MUST` pass automated syntax parsing or compilation (`ParseInput` for PowerShell, `py_compile` for Python, `ConvertFrom-Json` for JSON) before concluding a turn, proposing review, or claiming completion. Zero syntax errors or parse warnings are tolerated.
 - **no-verbosity**: Minimal, direct, and non-repetitive communication; zero conversational padding or pleasantries.
 - **zero-conversational-padding**: Prohibit conversational filler, greetings, pleasantries, or preamble/postamble framing.
 - **explicit-reasoning**: Provide clear, deterministic technical rationale for all actions, architecture, and diagnostics.

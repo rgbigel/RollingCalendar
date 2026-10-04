@@ -9,9 +9,9 @@ Module: ReviewCommitGovernancePolicy
 Purpose: Defines mandatory review-gated commit rules, review disposition handling, authorized bypass exceptions, audit logging, and single-session directory junction reviews.  
 Path: .agents/rules/ReviewCommitGovernancePolicy.md  
 Authors: Rolf, LCM_AI Governance  
-Version: 8.4.0  
+Version: 8.5.0  
 Status: Authoritative Policy  
-Date: 2026-10-02  
+Date: 2026-10-03  
 
 ---
 
@@ -90,4 +90,10 @@ Every review disposition (`Completed`, `CompletedWithEdits`, `Rejected`, `Deferr
 1. **Operator Visibility**: When an agent discovers that a review defect, tool repair, or validation result changes the durable review contract, it `MUST` tell the operator before claiming the implementation is complete. The disclosure `MUST` distinguish the implemented code change from the pending governance or documentation change.
 2. **Same-Change-Set Policy Update**: Where the finding defines a recurring review behavior, the agent `MUST` update this policy in the same governed change set, including the exact invariant, evidence fields, and required tool behavior. A tool-only repair is incomplete until this policy update is present or the operator explicitly defers it.
 3. **Synchronized Discovery Surface**: Any update under this rule `MUST` synchronize the root `AGENTS.md` rule index and `LCM_AI/docs/LCM-Rules-Cross-Reference.md` under `RULE-AUTH-002`.
+
+---
+
+### RULE-REV-010: Zero-Assumption Pre-Review Gate Verification Invariant
+1. **Mandatory Mechanical Verification Before Review**: Before any proposal or change set is presented for Gate 2 visual review or commit gating, all modified or created files `MUST` have undergone mandatory mechanical syntax parsing (PowerShell AST parser, Python compile, JSON validation) and unit test execution (Pester).
+2. **Prohibition of Unverified Readiness Claims**: An AI agent or developer `MUST NEVER` launch a Beyond Compare review session, claim review readiness, or solicit operator review disposition based on visual inspection alone without prior execution evidence recorded in `Walkthrough.md`.
 

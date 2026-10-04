@@ -9,9 +9,9 @@ Module: PowerShellStandardsPolicy
 Purpose: Defines mandatory PowerShell 7 (pwsh) standards for strict mode resilience, verb compliance, string interpolation, intermediate code execution, and pipeline hygiene.  
 Path: .agents/rules/PowerShellStandardsPolicy.md  
 Authors: Rolf, LCM_AI Governance  
-Version: 8.6.0  
+Version: 8.7.0  
 Status: Authoritative Policy  
-Date: 2026-09-26  
+Date: 2026-10-03  
 
 ---
 
@@ -290,6 +290,14 @@ The PowerShell standards codified in this policy (`RULE-PS-001` through `RULE-PS
 ### RULE-PS-020: Class Dependency Runspace Pre-loading for AST Validation
 When performing static AST validation on PowerShell scripts that utilize custom classes as type annotations, all prerequisite class definition files must be dot-sourced into the runspace before invoking `[System.Management.Automation.Language.Parser]::ParseFile()`.
 - **Rationale**: PowerShell's AST parser cannot resolve custom type tokens unless the type is already loaded in the active runspace, throwing false-positive syntax errors.
+
+---
+
+### RULE-PS-021: Mandatory Pre-Handoff AST Syntax Gate & Zero-Assumption Testing Invariant
+Whenever a permanent repository script (`*.ps1`, `*.psm1`, `*.psd1`) or test file is created or modified by an AI agent or developer:
+1. **Mandatory Pre-Handoff AST Parse Gate**: The agent `MUST` validate the script using PowerShell's native AST parser `[System.Management.Automation.Language.Parser]::ParseInput()` before declaring a task complete, proposing completion, or handing control back to the operator. Zero syntax errors or parse warnings are tolerated.
+2. **Zero-Assumption Testing Invariant**: The agent `MUST NOT` assume or assert that code is valid, ready, or functional without executing either its unit tests (Pester) or an explicit syntax parse first. Relying on visual inspection alone or declaring ready without executing test verification is strictly prohibited.
+
 
 
 

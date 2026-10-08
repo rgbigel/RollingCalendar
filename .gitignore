@@ -3,3 +3,6 @@
 
 # VS Code workspace settings
 .vscode/
+
+# Governance rules are a junction to the canonical hub (LCM_AI)
+.agents/
